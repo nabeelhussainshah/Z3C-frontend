@@ -7,7 +7,7 @@ import AsyncSelect from 'react-select/async';
 import { useAtomValue } from 'jotai';
 
 // APIs
-import { InvoiceCreateRequest, InvoiceDetailRequest, InvoiceUpdateRequest, InvoiceCheckComplianceRequest, InvoiceSubmitToZatcaRequest, InvoicePdfDownloadRequest, CustomerListRequest } from '../../../requests';
+import { InvoiceCreateRequest, InvoiceDetailRequest, InvoiceUpdateRequest, InvoiceCheckComplianceRequest, InvoiceSubmitToZatcaRequest, InvoicePdfDownloadRequest, InvoiceProformaPdfDownloadRequest, CustomerListRequest } from '../../../requests';
 
 // Utils
 import { Footer, ErrorFallback } from '../../../components';
@@ -662,6 +662,104 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
       }, 10000);
     } catch (error) {
       showToast(error?.message || 'Failed to create invoice and download PDF', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePrintProformaInvoice = async () => {
+    if (!id) return;
+
+    if (isSubmitting) {
+      showToast('Please wait for the previous request to complete', 'error');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const pdfBlob = await InvoiceProformaPdfDownloadRequest(decodedToken, id);
+      const fileURL = window.URL.createObjectURL(pdfBlob);
+      const pdfWindow = window.open(fileURL, '_blank');
+
+      if (!pdfWindow) {
+        showToast('Please allow popups to view the proforma invoice PDF', 'error');
+      } else {
+        showToast('Proforma invoice PDF opened in a new tab', 'success');
+      }
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(fileURL);
+      }, 10000);
+    } catch (error) {
+      showToast(error?.message || 'Failed to download proforma invoice PDF', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateAndPrintProformaInvoice = async () => {
+    if (!id) return;
+
+    if (isSubmitting) {
+      showToast('Please wait for the previous request to complete', 'error');
+      return;
+    }
+
+    if (!handleValidateAll()) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await handleUpdateInvoice();
+      const pdfBlob = await InvoiceProformaPdfDownloadRequest(decodedToken, id);
+      const fileURL = window.URL.createObjectURL(pdfBlob);
+      const pdfWindow = window.open(fileURL, '_blank');
+
+      if (!pdfWindow) {
+        showToast('Please allow popups to view the proforma invoice PDF', 'error');
+      } else {
+        showToast('Invoice updated and proforma PDF opened in a new tab', 'success');
+      }
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(fileURL);
+      }, 10000);
+    } catch (error) {
+      showToast(error?.message || 'Failed to update invoice and download proforma PDF', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateAndPrintProformaInvoice = async () => {
+    if (isSubmitting) {
+      showToast('Please wait for the previous request to complete', 'error');
+      return;
+    }
+
+    if (!handleValidateAll()) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const createdInvoiceId = await handleCreateInvoice();
+      const pdfBlob = await InvoiceProformaPdfDownloadRequest(decodedToken, createdInvoiceId);
+      const fileURL = window.URL.createObjectURL(pdfBlob);
+      const pdfWindow = window.open(fileURL, '_blank');
+
+      if (!pdfWindow) {
+        showToast('Please allow popups to view the proforma invoice PDF', 'error');
+      } else {
+        showToast('Invoice created and proforma PDF opened in a new tab', 'success');
+      }
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(fileURL);
+      }, 10000);
+    } catch (error) {
+      showToast(error?.message || 'Failed to create invoice and download proforma PDF', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -1582,6 +1680,8 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
 
 
   const FOOTER_ACTION_BAR = () => {
+    const isDraftOrNew = !id || formData.data.status === 'DRAFT' || formData.data.status === '';
+
     const editModeOptions = [
       { value: 'create', label: id ? 'Update' : 'Create' },
       ...(canCheckComplianceAction
@@ -1604,10 +1704,21 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
         value: 'print-report-pdf',
         label: id ? 'Update and Print Pdf' : 'Create and Print Pdf',
       },
+      ...(isDraftOrNew
+        ? [
+          {
+            value: 'print-proforma-pdf',
+            label: id ? 'Update and Print Proforma' : 'Create and Print Proforma',
+          },
+        ]
+        : []),
       { value: 'cancel', label: 'Cancel' },
     ];
     const viewModeOptions = [
       { value: 'print-report-pdf', label: 'Print Pdf' },
+      ...(isDraftOrNew
+        ? [{ value: 'print-proforma-pdf', label: 'Print Proforma' }]
+        : []),
       ...(canCheckComplianceAction
         ? [{ value: 'check-compliance', label: 'Check Compliance' }]
         : []),
@@ -1676,6 +1787,18 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
                         }
                       } else {
                         handleCreateAndPrintInvoice();
+                      }
+                      return;
+                    }
+                    else if (option.value === 'print-proforma-pdf') {
+                      if (id) {
+                        if (canEditInvoice) {
+                          handleUpdateAndPrintProformaInvoice();
+                        } else {
+                          handlePrintProformaInvoice();
+                        }
+                      } else {
+                        handleCreateAndPrintProformaInvoice();
                       }
                       return;
                     }

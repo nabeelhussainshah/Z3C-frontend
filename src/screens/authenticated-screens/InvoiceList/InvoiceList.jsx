@@ -10,6 +10,7 @@ import {
   InvoiceListRequest,
   InvoiceDeleteRequest,
   InvoicePdfDownloadRequest,
+  InvoiceProformaPdfDownloadRequest,
   InvoiceCreateCreditNoteRequest,
   InvoiceCreateDebitNoteRequest,
   InvoiceSubmitToZatcaRequest,
@@ -565,6 +566,26 @@ function InvoicesTableContent({
     }
   };
 
+  const handlePrintProformaInvoice = async (invoiceId) => {
+    if (!invoiceId) return;
+    try {
+      const pdfBlob = await InvoiceProformaPdfDownloadRequest(decodedToken, invoiceId);
+      const fileURL = window.URL.createObjectURL(pdfBlob);
+
+      const pdfWindow = window.open(fileURL, '_blank');
+
+      if (!pdfWindow) {
+        showToast('Please allow popups to view the proforma invoice PDF', 'error');
+      }
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(fileURL);
+      }, 10000);
+    } catch (error) {
+      showToast(error?.message || 'Failed to download proforma invoice PDF', 'error');
+    }
+  };
+
   const columns = useMemo(
     () => [
       {
@@ -686,6 +707,7 @@ function InvoicesTableContent({
           const canCreateCreditNote = !!statusConfig?.canCreateCreditNote;
           const canCreateDebitNote = !!statusConfig?.canCreateDebitNote;
           const canCheckCompliance = !!statusConfig?.canCheckCompliance;
+          const canPrintProforma = row.original.status === 'DRAFT';
 
           const isBusy = !!actionBusyId;
 
@@ -697,6 +719,8 @@ function InvoicesTableContent({
               navigate(`/invoices/${row.original._id}`);
             } else if (value === 'print') {
               handlePrintInvoice(row.original._id);
+            } else if (value === 'print-proforma') {
+              handlePrintProformaInvoice(row.original._id);
             } else if (value === 'compliance-response') {
               handleOpenComplianceResponseModal(row.original);
             } else if (value === 'clearance-response') {
@@ -730,6 +754,9 @@ function InvoicesTableContent({
               </option>
               <option value="view">View</option>
               <option value="print">Print</option>
+              {canPrintProforma && (
+                <option value="print-proforma">Print Proforma</option>
+              )}
               {(row.original.compliance && Object.keys(row.original.compliance).length > 0) && (
                 <option value="compliance-response">View Compliance Response</option>
               )}
