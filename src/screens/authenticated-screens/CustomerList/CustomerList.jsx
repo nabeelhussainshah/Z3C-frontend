@@ -343,8 +343,14 @@ function CustomersTableContent({
         accessorKey: 'customerVAT',
         header: 'Customer VAT',
         enableSorting: true,
-        cell: ({ getValue }) => (
-          <span className="font-mono text-xs">{getValue()}</span>
+        // International customers have no KSA VAT — show their Other Buyer ID instead.
+        cell: ({ getValue, row }) => (
+          <span className="font-mono text-xs">
+            {getValue() ||
+              (row.original.identificationId
+                ? `${row.original.identificationScheme || 'OTH'}: ${row.original.identificationId}`
+                : '—')}
+          </span>
         ),
       },
       {

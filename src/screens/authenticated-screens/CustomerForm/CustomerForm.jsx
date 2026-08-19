@@ -15,11 +15,14 @@ import { showToast, validateSubmissionData, decodeString, parseLoginInfo, getNor
 
 const INITIAL_FORM_DATA = {
   data: {
+    customerType: 'domestic',
     registrationName: '',
     registrationNameAr: '',
     email: '',
     phone: '',
     customerVAT: '',
+    identificationScheme: 'OTH',
+    identificationId: '',
     address: '',
     addressAr: '',
     streetName: '',
@@ -57,6 +60,52 @@ const INITIAL_FORM_DATA = {
     },
   },
   errors: {},
+};
+
+// ZATCA Other Buyer ID (BT-46) schemes offered for international customers.
+// OTH is preselected — ZATCA requires OTH for buyers outside KSA, even when
+// the buyer supplies a foreign VAT/CR number.
+const IDENTIFICATION_SCHEME_OPTIONS = [
+  { value: 'OTH', label: 'Other ID (OTH)' },
+  { value: 'NAT', label: 'National ID (NAT)' },
+  { value: 'IQA', label: 'Iqama Number (IQA)' },
+  { value: 'PAS', label: 'Passport (PAS)' },
+  { value: 'GCC', label: 'GCC ID (GCC)' },
+  { value: 'TIN', label: 'Tax Identification Number (TIN)' },
+];
+
+// Format checks per ZATCA BR-KSA-F-10.
+const IDENTIFICATION_ID_PATTERNS = {
+  TIN: { regex: /^3\d{9}$/, hint: '10 digits starting with 3' },
+  NAT: { regex: /^1\d{9}$/, hint: '10 digits starting with 1' },
+  IQA: { regex: /^2\d{9}$/, hint: '10 digits starting with 2' },
+  PAS: { regex: /^[A-Za-z0-9]+$/, hint: 'alphanumeric, no spaces or symbols' },
+  GCC: { regex: /^[A-Za-z0-9]+$/, hint: 'alphanumeric, no spaces or symbols' },
+  OTH: { regex: /^[A-Za-z0-9]+$/, hint: 'alphanumeric, no spaces or symbols' },
+};
+
+/**
+ * Validation rules depend on the customer type: domestic customers keep the
+ * KSA rules (VAT, 4-digit building number, 5-digit postal zone); per ZATCA
+ * BR-KSA-10 international customers only need street, city and country code,
+ * plus a scheme + identification ID pair instead of VAT.
+ */
+const getValidations = (customerType, identificationScheme) => {
+  const base = { ...INITIAL_FORM_DATA.validations };
+  if (customerType !== 'international') return base;
+
+  const { customerVAT, ...rest } = base;
+  const scheme = IDENTIFICATION_ID_PATTERNS[identificationScheme] || IDENTIFICATION_ID_PATTERNS.OTH;
+  return {
+    ...rest,
+    buildingNumber: { label: 'Building Number' },
+    postalZone: { label: 'Postal Zone' },
+    identificationId: {
+      isRequired: true,
+      regex: scheme.regex,
+      label: `Identification Number (${scheme.hint})`,
+    },
+  };
 };
 
 function CustomerForm() {
@@ -124,11 +173,14 @@ function CustomerFormContent({ id, customerPromise, decodedToken, navigate }) {
         ...old,
         data: {
           ...old.data,
+          customerType: apiData.customerType || 'domestic',
           registrationName: apiData.registrationName || '',
           registrationNameAr: apiData.registrationNameAr || '',
           email: apiData.email || '',
           phone: apiData.phone || '',
           customerVAT: apiData.customerVAT || '',
+          identificationScheme: apiData.identificationScheme || 'OTH',
+          identificationId: apiData.identificationId || '',
           address: apiData.address || '',
           addressAr: apiData.addressAr || '',
           streetName: apiData.streetName || '',
@@ -160,12 +212,21 @@ function CustomerFormContent({ id, customerPromise, decodedToken, navigate }) {
   // *********** Handlers ***********
   const handleChangeFormData = (e) => {
     let value = e.target.value;
+    const isInternational = formData.data.customerType === 'international';
     if (e.target.name === 'customerVAT') {
       value = value.replace(/\D/g, '').slice(0, 15);
     } else if (e.target.name === 'postalZone') {
-      value = value.replace(/\D/g, '').slice(0, 5);
+      // Foreign postal codes may contain letters/spaces (e.g. UK).
+      value = isInternational
+        ? value.replace(/[^A-Za-z0-9 -]/g, '').slice(0, 12)
+        : value.replace(/\D/g, '').slice(0, 5);
     } else if (e.target.name === 'buildingNumber') {
-      value = value.replace(/\D/g, '').slice(0, 4);
+      value = isInternational
+        ? value.slice(0, 20)
+        : value.replace(/\D/g, '').slice(0, 4);
+    } else if (e.target.name === 'identificationId') {
+      // ZATCA: buyer IDs are alphanumeric only, no spaces or symbols.
+      value = value.replace(/[^A-Za-z0-9]/g, '');
     }
     _formData(old => ({
       ...old,
@@ -173,6 +234,23 @@ function CustomerFormContent({ id, customerPromise, decodedToken, navigate }) {
         ...old.data,
         [e.target.name]: value,
       },
+    }));
+  };
+
+  const handleCustomerTypeChange = (e) => {
+    const customerType = e.target.value;
+    _formData(old => ({
+      ...old,
+      data: {
+        ...old.data,
+        customerType,
+        // Each type carries a different identity — clear the other side so
+        // stale values never leak into the payload.
+        customerVAT: '',
+        identificationScheme: 'OTH',
+        identificationId: '',
+      },
+      errors: {},
     }));
   };
 
@@ -219,19 +297,18 @@ function CustomerFormContent({ id, customerPromise, decodedToken, navigate }) {
   };
 
   const handleValidateForm = () => {
-    const { allValid, errors } = validateSubmissionData(formData.data, formData.validations);
-    if (!allValid) {
-      _formData(old => ({
-        ...old,
-        errors,
-      }));
-    } else {
-      _formData(old => ({
-        ...old,
-        errors: {}
-      }));
+    const isInternational = formData.data.customerType === 'international';
+    const validations = getValidations(formData.data.customerType, formData.data.identificationScheme);
+    const { allValid, errors } = validateSubmissionData(formData.data, validations);
+    if (isInternational && (formData.data.countryCode || '').trim().toUpperCase() === 'SA') {
+      errors.countryCode = 'Country Code must not be SA for international customers';
     }
-    return allValid;
+    const finalValid = allValid && Object.keys(errors).length === 0;
+    _formData(old => ({
+      ...old,
+      errors: finalValid ? {} : errors,
+    }));
+    return finalValid;
   };
 
   const handleSubmitForm = (e) => {
@@ -239,7 +316,9 @@ function CustomerFormContent({ id, customerPromise, decodedToken, navigate }) {
     if (handleValidateForm()) {
       _isLoading(true);
 
+      const isInternational = formData.data.customerType === 'international';
       const payloadData = {
+        customerType: formData.data.customerType,
         streetName: formData.data.streetName,
         streetNameAr: formData.data.streetNameAr,
         address: formData.data.address,
@@ -251,7 +330,14 @@ function CustomerFormContent({ id, customerPromise, decodedToken, navigate }) {
         cityNameAr: formData.data.cityNameAr,
         postalZone: formData.data.postalZone,
         countryCode: formData.data.countryCode,
-        customerVAT: formData.data.customerVAT,
+        // Domestic buyers are identified by KSA VAT; international buyers by
+        // a scheme + ID pair. Never send the other type's identity.
+        ...(isInternational
+          ? {
+              identificationScheme: formData.data.identificationScheme,
+              identificationId: formData.data.identificationId,
+            }
+          : { customerVAT: formData.data.customerVAT }),
         registrationName: formData.data.registrationName,
         registrationNameAr: formData.data.registrationNameAr,
         email: formData.data.email,
@@ -290,9 +376,29 @@ function CustomerFormContent({ id, customerPromise, decodedToken, navigate }) {
     </div>
   );
 
-  const BASIC_INFO_SECTION = () => (
+  const BASIC_INFO_SECTION = () => {
+    const isInternational = formData.data.customerType === 'international';
+    return (
     <section className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-[#0d121b] dark:text-white">Customer Type *</label>
+          <select
+            name="customerType"
+            value={formData.data.customerType || 'domestic'}
+            onChange={handleCustomerTypeChange}
+            className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+          >
+            <option value="domestic">Domestic (Saudi Arabia)</option>
+            <option value="international">International (Outside KSA)</option>
+          </select>
+          {isInternational && (
+            <span className="text-xs text-[#4c669a] dark:text-gray-400">
+              ZATCA: foreign buyers are identified by an Other Buyer ID (scheme + number) instead of a VAT number.
+            </span>
+          )}
+        </div>
 
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-[#0d121b] dark:text-white">Registered Name *</label>
@@ -389,32 +495,78 @@ function CustomerFormContent({ id, customerPromise, decodedToken, navigate }) {
           />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-[#0d121b] dark:text-white">Customer VAT *</label>
-          <input
-            type="text"
-            inputMode="numeric"
-            maxLength={15}
-            name="customerVAT"
-            value={formData.data.customerVAT || ''}
-            onChange={handleChangeFormData}
-            placeholder="330000000000003"
-            className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-          />
-          {formData.errors.customerVAT && (
-            <span className="text-xs text-tomato">{formData.errors.customerVAT}</span>
-          )}
-        </div>
+        {!isInternational && (
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-[#0d121b] dark:text-white">Customer VAT *</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={15}
+              name="customerVAT"
+              value={formData.data.customerVAT || ''}
+              onChange={handleChangeFormData}
+              placeholder="330000000000003"
+              className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+            />
+            {formData.errors.customerVAT && (
+              <span className="text-xs text-tomato">{formData.errors.customerVAT}</span>
+            )}
+          </div>
+        )}
+
+        {isInternational && (
+          <Fragment>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-[#0d121b] dark:text-white">Identification Type *</label>
+              <select
+                name="identificationScheme"
+                value={formData.data.identificationScheme || 'OTH'}
+                onChange={handleChangeFormData}
+                className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+              >
+                {IDENTIFICATION_SCHEME_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              {formData.errors.identificationScheme && (
+                <span className="text-xs text-tomato">{formData.errors.identificationScheme}</span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-[#0d121b] dark:text-white">Identification Number *</label>
+              <input
+                type="text"
+                name="identificationId"
+                value={formData.data.identificationId || ''}
+                onChange={handleChangeFormData}
+                placeholder="e.g. foreign VAT / CR / passport number"
+                className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+              />
+              {formData.errors.identificationId && (
+                <span className="text-xs text-tomato">{formData.errors.identificationId}</span>
+              )}
+            </div>
+          </Fragment>
+        )}
       </div>
     </section >
   );
+  };
 
-  const ADDRESS_DETAILS_SECTION = () => (
+  const ADDRESS_DETAILS_SECTION = () => {
+    const isInternational = formData.data.customerType === 'international';
+    return (
     <section className="space-y-6">
       <div className="flex items-center gap-2 pb-2">
         <button className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-[#0d121b] dark:text-white text-sm font-medium rounded-lg">
           Address Details
         </button>
+        {isInternational && (
+          <span className="text-xs text-[#4c669a] dark:text-gray-400">
+            For international customers only street, city and country code are mandatory (ZATCA BR-KSA-10).
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -483,11 +635,11 @@ function CustomerFormContent({ id, customerPromise, decodedToken, navigate }) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-[#0d121b] dark:text-white">Building Number *</label>
+          <label className="text-sm font-medium text-[#0d121b] dark:text-white">Building Number{isInternational ? '' : ' *'}</label>
           <input
             type="text"
             inputMode="numeric"
-            maxLength={4}
+            maxLength={formData.data.customerType === 'international' ? 20 : 4}
             name="buildingNumber"
             value={formData.data.buildingNumber || ''}
             onChange={handleChangeFormData}
@@ -564,15 +716,15 @@ function CustomerFormContent({ id, customerPromise, decodedToken, navigate }) {
 
         {/* Row 4 */}
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-[#0d121b] dark:text-white">Postal Zone *</label>
+          <label className="text-sm font-medium text-[#0d121b] dark:text-white">Postal Zone{isInternational ? '' : ' *'}</label>
           <input
             type="text"
-            inputMode="numeric"
-            maxLength={5}
+            inputMode={isInternational ? 'text' : 'numeric'}
+            maxLength={isInternational ? 12 : 5}
             name="postalZone"
             value={formData.data.postalZone || ''}
             onChange={handleChangeFormData}
-            placeholder="12345"
+            placeholder={isInternational ? 'e.g. SW1A 1AA' : '12345'}
             className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
           />
           {formData.errors.postalZone && (
@@ -588,7 +740,7 @@ function CustomerFormContent({ id, customerPromise, decodedToken, navigate }) {
             name="countryCode"
             value={formData.data.countryCode || ''}
             onChange={handleChangeFormData}
-            placeholder="SA"
+            placeholder={isInternational ? 'e.g. AE' : 'SA'}
             className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
           />
           {formData.errors.countryCode && (
@@ -598,6 +750,7 @@ function CustomerFormContent({ id, customerPromise, decodedToken, navigate }) {
       </div>
     </section>
   );
+  };
 
   const FORM_ACTIONS = () => (
     <div className="flex gap-3 pt-6">

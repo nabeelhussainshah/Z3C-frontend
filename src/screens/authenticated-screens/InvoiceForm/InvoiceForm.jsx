@@ -31,6 +31,9 @@ const INITIAL_FORM_DATA = {
     email: '',
     phone: '',
     customerVAT: '',
+    customerType: 'domestic',
+    identificationScheme: '',
+    identificationId: '',
     streetName: '',
     streetNameAr: '',
     address: '',
@@ -179,6 +182,9 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           email: customer.email || '',
           phone: customer.phone || '',
           customerVAT: customer.customerVAT || '',
+          customerType: customer.customerType || 'domestic',
+          identificationScheme: customer.identificationScheme || '',
+          identificationId: customer.identificationId || '',
           address: customer.address || '',
           addressAr: customer.addressAr || '',
           streetName: customer.streetName || '',
@@ -240,6 +246,9 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           email: customer.email || '',
           phone: customer.phone || '',
           customerVAT: customer.customerVAT || '',
+          customerType: customer.customerType || 'domestic',
+          identificationScheme: customer.identificationScheme || '',
+          identificationId: customer.identificationId || '',
           streetName: customer.streetName || '',
           streetNameAr: customer.streetNameAr || '',
           address: customer.address || '',
@@ -264,6 +273,9 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           email: '',
           phone: '',
           customerVAT: '',
+          customerType: 'domestic',
+          identificationScheme: '',
+          identificationId: '',
           streetName: '',
           streetNameAr: '',
           address: '',
@@ -1315,19 +1327,59 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           />
         </div>
 
-        {/* VAT */}
+        {/* Customer Type (read-only — managed on the customer record) */}
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400">Customer VAT</label>
+          <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400">Customer Type</label>
           <input
-            name="customerVAT"
+            name="customerType"
             type="text"
-            value={formData.data.customerVAT}
-            onChange={handleChangeFormData}
-            placeholder="300000000000003"
-            disabled={!!formData.data.customerId}
+            value={formData.data.customerType === 'international' ? 'International (Outside KSA)' : 'Domestic (Saudi Arabia)'}
+            disabled
             className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] bg-white text-sm text-[#0d121b] focus:ring-2 focus:ring-primary focus:border-primary transition-colors dark:bg-[#161f30] dark:border-[#2a3447] dark:text-white disabled:bg-gray-50 dark:disabled:bg-[#0a0e1a] disabled:cursor-not-allowed disabled:text-gray-500 dark:disabled:text-gray-500"
           />
         </div>
+
+        {/* VAT (domestic buyers) */}
+        {formData.data.customerType !== 'international' && (
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400">Customer VAT</label>
+            <input
+              name="customerVAT"
+              type="text"
+              value={formData.data.customerVAT}
+              onChange={handleChangeFormData}
+              placeholder="300000000000003"
+              disabled={!!formData.data.customerId}
+              className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] bg-white text-sm text-[#0d121b] focus:ring-2 focus:ring-primary focus:border-primary transition-colors dark:bg-[#161f30] dark:border-[#2a3447] dark:text-white disabled:bg-gray-50 dark:disabled:bg-[#0a0e1a] disabled:cursor-not-allowed disabled:text-gray-500 dark:disabled:text-gray-500"
+            />
+          </div>
+        )}
+
+        {/* Other Buyer ID (international buyers) */}
+        {formData.data.customerType === 'international' && (
+          <Fragment>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400">Identification Type</label>
+              <input
+                name="identificationScheme"
+                type="text"
+                value={formData.data.identificationScheme}
+                disabled
+                className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] bg-white text-sm text-[#0d121b] focus:ring-2 focus:ring-primary focus:border-primary transition-colors dark:bg-[#161f30] dark:border-[#2a3447] dark:text-white disabled:bg-gray-50 dark:disabled:bg-[#0a0e1a] disabled:cursor-not-allowed disabled:text-gray-500 dark:disabled:text-gray-500"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400">Identification Number</label>
+              <input
+                name="identificationId"
+                type="text"
+                value={formData.data.identificationId}
+                disabled
+                className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] bg-white text-sm text-[#0d121b] focus:ring-2 focus:ring-primary focus:border-primary transition-colors dark:bg-[#161f30] dark:border-[#2a3447] dark:text-white disabled:bg-gray-50 dark:disabled:bg-[#0a0e1a] disabled:cursor-not-allowed disabled:text-gray-500 dark:disabled:text-gray-500"
+              />
+            </div>
+          </Fragment>
+        )}
 
         {/* Registration Name Arabic */}
         <div className="flex flex-col gap-2">
