@@ -29,9 +29,12 @@ function CustomerList() {
   const [searchQuery, _searchQuery] = useState('');
   const [appliedSearchQuery, _appliedSearchQuery] = useState('');
   const [isFilterOpen, _isFilterOpen] = useState(false);
-  const [, _isActionsOpen] = useState(false);
   const [rowSelection, _rowSelection] = useState({});
+  const [isBulkDeleteModalOpen, _isBulkDeleteModalOpen] = useState(false);
   const [reloadKey, _reloadKey] = useState(0);
+
+  // Number of rows currently selected via checkboxes
+  const selectedRowCount = Object.keys(rowSelection).filter((key) => rowSelection[key]).length;
 
   // Filters state
   const [filters, _filters] = useState({
@@ -70,8 +73,8 @@ function CustomerList() {
   // *********** Render Functions ***********
 
   const TableLoadingSkeleton = () => (
-    <div className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447] shadow-sm overflow-hidden">
-      <div className="px-6 py-8 text-center text-sm text-[#4c669a]">
+    <div className="breeze-table-card">
+      <div className="px-6 py-8 text-center text-sm text-[var(--z3c-subtle)]">
         <div className="flex items-center justify-center gap-2">
           <span className="material-symbols-outlined animate-spin">sync</span>
           Loading Customers...
@@ -81,23 +84,17 @@ function CustomerList() {
   );
 
   const PAGE_HEADER = () => (
-    <div className="flex flex-wrap justify-between items-end gap-4">
-      <div className="space-y-1">
-        <h2 className="text-[#0d121b] dark:text-white text-3xl font-black tracking-tight">
-          Customers
-        </h2>
-        <p className="text-[#4c669a] text-base">Manage your customer information and records</p>
-      </div>
+    <div>
+      <h2 className="breeze-page__title">Customers</h2>
+      <p className="breeze-page__lede">Manage your customer information and records</p>
     </div>
   );
 
   const SEARCH_FILTERS_SECTION = () => (
-    <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
-      <div className="flex-1 max-w-md">
-        <div className="relative">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#4c669a] text-[20px]">
-            search
-          </span>
+    <div className="breeze-toolbar">
+      <div className="breeze-search">
+        <div className="breeze-field__control">
+          <span className="material-symbols-outlined breeze-field__icon">search</span>
           <input
             type="text"
             placeholder="Search customers..."
@@ -109,16 +106,28 @@ function CustomerList() {
                 _pagination((prev) => ({ ...prev, pageIndex: 0 }));
               }
             }}
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white placeholder:text-[#4c669a] focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+            className="breeze-input"
           />
         </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
+        {selectedRowCount > 0 && customerPerms.delete && (
+          <button
+            type="button"
+            onClick={() => _isBulkDeleteModalOpen(true)}
+            className="breeze-btn breeze-btn--danger-soft"
+          >
+            <span className="material-symbols-outlined text-[20px]">delete</span>
+            Bulk Delete ({selectedRowCount})
+          </button>
+        )}
+
         <div className="relative">
           <button
+            type="button"
             onClick={() => _isFilterOpen(!isFilterOpen)}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm font-medium text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors w-full sm:w-auto"
+            className="breeze-btn breeze-btn--outline breeze-btn--inline w-full sm:w-auto"
           >
             <span className="material-symbols-outlined text-[20px]">filter_list</span>
             Filters
@@ -128,30 +137,32 @@ function CustomerList() {
           </button>
 
           {isFilterOpen && (
-            <div className="absolute right-0 mt-2 z-30 w-64 bg-white dark:bg-[#161f30] rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] shadow-lg">
-              <div className="p-4 space-y-4">
+            <div className="breeze-panel">
+              <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400 uppercase tracking-wider">Status</label>
+                  <label className="breeze-panel__label">Status</label>
                   <select
                     value={filters.isActive}
                     onChange={(e) => handleFilterChange('isActive', e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#0f1323] text-sm text-[#0d121b] dark:text-white py-2 px-3"
+                    className="breeze-select"
                   >
                     <option value="">All</option>
                     <option value="true">Active</option>
                     <option value="false">Inactive</option>
                   </select>
                 </div>
-                <div className="flex gap-2 pt-2 border-t border-[#e7ebf3] dark:border-[#2a3447]">
+                <div className="flex gap-2 pt-2 border-t border-[var(--z3c-divider)]">
                   <button
+                    type="button"
                     onClick={resetFilters}
-                    className="flex-1 px-3 py-2 text-sm font-medium text-[#4c669a] hover:text-[#0d121b] dark:hover:text-white transition-colors"
+                    className="breeze-link flex-1"
                   >
                     Reset
                   </button>
                   <button
+                    type="button"
                     onClick={applyFilters}
-                    className="flex-1 px-3 py-2 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                    className="breeze-btn breeze-btn--primary breeze-btn--inline flex-1"
                   >
                     Apply
                   </button>
@@ -163,8 +174,9 @@ function CustomerList() {
 
         {customerPerms.create && (
           <button
+            type="button"
             onClick={() => navigate('/customer/new')}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shadow-md shadow-primary/20 w-full sm:w-auto"
+            className="breeze-btn breeze-btn--primary breeze-btn--inline w-full sm:w-auto"
           >
             <span className="material-symbols-outlined text-[20px]">add</span>
             Create Customer
@@ -176,7 +188,7 @@ function CustomerList() {
 
   const CONTENT = () => (
     <Fragment>
-      <div className="p-8 space-y-6">
+      <div className="breeze-page flex-1">
         {PAGE_HEADER()}
         {SEARCH_FILTERS_SECTION()}
         <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => window.location.reload()}>
@@ -189,6 +201,12 @@ function CustomerList() {
               _sorting={_sorting}
               _pagination={_pagination}
               _rowSelection={_rowSelection}
+              isBulkDeleteModalOpen={isBulkDeleteModalOpen}
+              onBulkDeleteModalClose={() => _isBulkDeleteModalOpen(false)}
+              onBulkDeleteComplete={() => {
+                _isBulkDeleteModalOpen(false);
+                _rowSelection({});
+              }}
               refreshCustomers={() => _reloadKey((prev) => prev + 1)}
             />
           </Suspense>
@@ -199,7 +217,7 @@ function CustomerList() {
   );
 
   return (
-    <div id="customer-list">
+    <div id="customer-list" className="flex min-h-0 flex-1 flex-col">
       {CONTENT()}
     </div>
   );
@@ -213,6 +231,9 @@ function CustomersTableContent({
   _pagination,
   _sorting,
   _rowSelection,
+  isBulkDeleteModalOpen,
+  onBulkDeleteModalClose,
+  onBulkDeleteComplete,
   refreshCustomers,
 }) {
   const navigate = useNavigate();
@@ -237,42 +258,22 @@ function CustomersTableContent({
     hasPreviousPage: page > 1,
   };
 
-  const [isDeleteModalOpen, _isDeleteModalOpen] = useState(false);
-  const [selectedCustomerId, _selectedCustomerId] = useState(null);
   const [isDeleting, _isDeleting] = useState(false);
 
   // *********** Handlers ***********
 
-  const handleOpenDeleteModal = (customerId) => {
-    if (!customerId) return;
-    _selectedCustomerId(customerId);
-    _isDeleteModalOpen(true);
-  };
+  // Navigate to customer edit screen when a row is clicked (excluding checkbox/link clicks)
+  const handleRowClick = useCallback((row, event) => {
+    if (!customerPerms.update || !row.original?._id) return;
+    if (event.target.closest('input[type="checkbox"]') || event.target.closest('a')) return;
 
-  const handleCloseDeleteModal = () => {
+    navigate(`/customer/${row.original._id}`);
+  }, [customerPerms.update, navigate]);
+
+  const handleCloseBulkDeleteModal = () => {
     if (isDeleting) return;
-    _isDeleteModalOpen(false);
-    _selectedCustomerId(null);
+    onBulkDeleteModalClose?.();
   };
-
-  const handleConfirmDelete = useCallback(() => {
-    if (!selectedCustomerId) return;
-
-    _isDeleting(true);
-    CustomerDeleteRequest(decodedToken, selectedCustomerId)
-      .then(() => {
-        showToast('Customer deleted successfully!', 'success');
-        _isDeleteModalOpen(false);
-        _selectedCustomerId(null);
-        refreshCustomers?.();
-      })
-      .catch((err) => {
-        showToast(err?.message || 'Failed to delete customer', 'error');
-      })
-      .finally(() => {
-        _isDeleting(false);
-      });
-  }, [decodedToken, selectedCustomerId, refreshCustomers]);
 
   const columns = useMemo(
     () => [
@@ -283,7 +284,8 @@ function CustomersTableContent({
             type="checkbox"
             checked={table.getIsAllRowsSelected()}
             onChange={table.getToggleAllRowsSelectedHandler()}
-            className="w-4 h-4 rounded border-[#e7ebf3] dark:border-[#2a3447] text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+            className="breeze-check__box"
           />
         ),
         cell: ({ row }) => (
@@ -291,7 +293,8 @@ function CustomersTableContent({
             type="checkbox"
             checked={row.getIsSelected()}
             onChange={row.getToggleSelectedHandler()}
-            className="w-4 h-4 rounded border-[#e7ebf3] dark:border-[#2a3447] text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+            className="breeze-check__box"
           />
         ),
         enableSorting: false,
@@ -331,7 +334,13 @@ function CustomersTableContent({
         header: 'Email',
         enableSorting: true,
         cell: ({ getValue }) => (
-          <a href={`mailto:${getValue()}`} className="text-primary hover:underline">{getValue()}</a>
+          <a
+            href={`mailto:${getValue()}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-primary hover:underline"
+          >
+            {getValue()}
+          </a>
         ),
       },
       {
@@ -373,52 +382,14 @@ function CustomersTableContent({
           );
         },
       },
-      {
-        id: 'actions',
-        header: 'Actions',
-        cell: ({ row }) => {
-          const isActive = row.original.isActive;
-          const canEdit = customerPerms.update;
-          const canDelete = customerPerms.delete && isActive;
-
-          if (!canEdit && !canDelete) return null;
-
-          const handleChange = (e) => {
-            const value = e.target.value;
-            if (!value) return;
-
-            if (value === 'edit') {
-              navigate(`/customer/${row.original._id}`);
-            } else if (value === 'delete') {
-              handleOpenDeleteModal(row.original._id);
-            }
-
-            e.target.value = '';
-          };
-
-          return (
-            <select
-              defaultValue=""
-              onChange={handleChange}
-              className="px-3 py-1.5 text-sm rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer"
-            >
-              <option value="" disabled>
-                Action
-              </option>
-              {canEdit && <option value="edit">Edit</option>}
-              {canDelete && <option value="delete">Delete</option>}
-            </select>
-          );
-        },
-        enableSorting: false,
-      },
     ],
-    [navigate, handleOpenDeleteModal, customerPerms]
+    []
   );
 
   const table = useReactTable({
     data: data.length > 0 ? data : [],
     columns,
+    getRowId: (row) => row._id,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -435,26 +406,54 @@ function CustomersTableContent({
     enableRowSelection: true,
   });
 
+  // Delete all selected active customers after confirmation
+  const handleConfirmBulkDelete = useCallback(() => {
+    const selectedRows = table.getSelectedRowModel().rows;
+    const deletableCustomers = selectedRows
+      .map((row) => row.original)
+      .filter((customer) => customerPerms.delete && customer.isActive && customer._id);
+
+    if (deletableCustomers.length === 0) {
+      showToast('No active customers selected for deletion', 'error');
+      return;
+    }
+
+    _isDeleting(true);
+    Promise.all(deletableCustomers.map((customer) => CustomerDeleteRequest(decodedToken, customer._id)))
+      .then(() => {
+        showToast(
+          deletableCustomers.length === 1
+            ? 'Customer deleted successfully!'
+            : `${deletableCustomers.length} customers deleted successfully!`,
+          'success'
+        );
+        onBulkDeleteComplete?.();
+        refreshCustomers?.();
+      })
+      .catch((err) => {
+        showToast(err?.message || 'Failed to delete selected customers', 'error');
+      })
+      .finally(() => {
+        _isDeleting(false);
+      });
+  }, [customerPerms.delete, decodedToken, onBulkDeleteComplete, refreshCustomers, table]);
+
   // *********** Render Functions ***********
 
   const CUSTOMER_TABLE = () => (
     <div className="overflow-x-auto">
-              <table className="w-full text-left min-w-[1400px]">
-        <thead className="bg-[#f8f9fc] dark:bg-[#1a253a] text-[#4c669a] dark:text-gray-400 text-xs font-bold uppercase tracking-wider">
+      <table>
+        <thead>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className={`px-6 py-4 ${
+                  className={`${
                     header.column.getCanSort()
-                      ? 'cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800'
+                      ? 'cursor-pointer select-none'
                       : ''
-                  } transition-colors ${header.id === 'select' ? 'w-12' : ''} ${
-                    header.id === 'actions'
-                      ? 'sticky right-0 bg-[#f8f9fc] dark:bg-[#1a253a] z-20 w-32 text-right'
-                      : ''
-                  }`}
+                  } ${header.id === 'select' ? 'w-12' : ''}`}
                   onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
                 >
                   <div className="flex items-center gap-2">
@@ -473,10 +472,10 @@ function CustomersTableContent({
             </tr>
           ))}
         </thead>
-        <tbody className="divide-y divide-[#e7ebf3] dark:divide-[#2a3447]">
+        <tbody>
           {data.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-6 py-8 text-center text-sm text-[#4c669a]">
+              <td colSpan={columns.length} className="!text-center text-[var(--z3c-subtle)]">
                 No customers found
               </td>
             </tr>
@@ -484,18 +483,13 @@ function CustomersTableContent({
             table.getRowModel().rows.map((row) => (
               <tr
                 key={row.id}
-                className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${row.getIsSelected() ? 'bg-primary/5 dark:bg-primary/10' : ''}`}
+                onClick={(event) => handleRowClick(row, event)}
+                className={`${row.getIsSelected() ? 'is-selected' : ''} ${customerPerms.update ? 'cursor-pointer' : ''}`}
               >
                 {row.getVisibleCells().map((cell) => (
                   <td
                     key={cell.id}
-                    className={`px-6 py-4 text-sm text-[#0d121b] dark:text-white ${
-                      cell.column.id === 'select' ? 'w-12' : ''
-                    } ${
-                      cell.column.id === 'actions'
-                        ? 'sticky right-0 bg-white dark:bg-[#161f30] z-10 w-32 text-right'
-                        : ''
-                    }`}
+                    className={cell.column.id === 'select' ? 'w-12' : ''}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
@@ -509,15 +503,16 @@ function CustomersTableContent({
   );
 
   const PAGINATION_SECTION = () => (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 bg-[#f8f9fc] dark:bg-[#1a253a] border-t border-[#e7ebf3] dark:border-[#2a3447]">
-      <div className="flex items-center gap-2 text-sm text-[#4c669a] dark:text-gray-400">
+    <div className="breeze-pager">
+      <div className="breeze-pager__size">
         <span>Showing</span>
         <select
           value={pagination.pageSize}
           onChange={(e) => {
             table.setPageSize(Number(e.target.value));
           }}
-          className="px-2 py-1 rounded border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+          className="breeze-select"
+          aria-label="Rows per page"
         >
           {PAGINATION_PAGE_SIZES.map((size) => (
             <option key={size} value={size}>
@@ -527,20 +522,24 @@ function CustomersTableContent({
         </select>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="breeze-pager__nav">
         <button
+          type="button"
           onClick={() => table.setPageIndex(0)}
           disabled={!paginationInfo.hasPreviousPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="First page"
         >
-          <span className="material-symbols-outlined text-[18px]">first_page</span>
+          <span className="material-symbols-outlined">first_page</span>
         </button>
         <button
+          type="button"
           onClick={() => table.previousPage()}
           disabled={!paginationInfo.hasPreviousPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="Previous page"
         >
-          <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+          <span className="material-symbols-outlined">chevron_left</span>
         </button>
 
         <div className="flex items-center gap-1">
@@ -558,12 +557,10 @@ function CustomersTableContent({
 
             return (
               <button
+                type="button"
                 key={pageNum}
                 onClick={() => table.setPageIndex(pageNum - 1)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${pagination.pageIndex + 1 === pageNum
-                  ? 'bg-primary text-white'
-                  : 'border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
+                className={`breeze-pagebtn ${pagination.pageIndex + 1 === pageNum ? 'is-current' : ''}`}
               >
                 {pageNum}
               </button>
@@ -572,41 +569,45 @@ function CustomersTableContent({
         </div>
 
         <button
+          type="button"
           onClick={() => table.nextPage()}
           disabled={!paginationInfo.hasNextPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="Next page"
         >
-          <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+          <span className="material-symbols-outlined">chevron_right</span>
         </button>
         <button
+          type="button"
           onClick={() => table.setPageIndex(paginationInfo.totalPages - 1)}
           disabled={!paginationInfo.hasNextPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="Last page"
         >
-          <span className="material-symbols-outlined text-[18px]">last_page</span>
+          <span className="material-symbols-outlined">last_page</span>
         </button>
       </div>
     </div>
   );
 
-  const CONFIRM_DELETE_MODAL = () => (
+  const CONFIRM_BULK_DELETE_MODAL = () => (
     <ConfirmModal
-      isOpen={isDeleteModalOpen}
-      title="Delete customer"
-      description="Are you sure you want to delete this customer? This action cannot be undone."
+      isOpen={isBulkDeleteModalOpen}
+      title="Delete selected customers"
+      description="Are you sure you want to delete the selected customers? Only active customers will be removed. This action cannot be undone."
       confirmLabel="Delete"
       cancelLabel="Cancel"
-      onConfirm={handleConfirmDelete}
-      onCancel={handleCloseDeleteModal}
+      onConfirm={handleConfirmBulkDelete}
+      onCancel={handleCloseBulkDeleteModal}
       isConfirming={isDeleting}
     />
   );
 
   return (
-    <div className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447] shadow-sm overflow-hidden">
+    <div className="breeze-table-card">
       {CUSTOMER_TABLE()}
       {PAGINATION_SECTION()}
-      {CONFIRM_DELETE_MODAL()}
+      {CONFIRM_BULK_DELETE_MODAL()}
     </div>
   );
 }

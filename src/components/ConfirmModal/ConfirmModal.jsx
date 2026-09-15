@@ -1,4 +1,5 @@
-import { Fragment } from 'react';
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 function ConfirmModal({
   isOpen,
@@ -10,6 +11,22 @@ function ConfirmModal({
   onCancel,
   isConfirming = false,
 }) {
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !isConfirming) onCancel?.();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, isConfirming, onCancel]);
+
   if (!isOpen) return null;
 
   const handleCancel = () => {
@@ -22,51 +39,60 @@ function ConfirmModal({
     onConfirm?.();
   };
 
-  return (
-    <Fragment>
-      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={handleCancel} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#161f30] shadow-2xl border border-[#e7ebf3] dark:border-[#2a3447]">
-          <div className="px-6 pt-6 pb-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400">
-                <span className="material-symbols-outlined text-[24px]">warning</span>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-[#0d121b] dark:text-white">
-                  {title}
-                </h3>
-                {description && (
-                  <p className="mt-2 text-sm text-[#4c669a] dark:text-gray-400">
-                    {description}
-                  </p>
-                )}
-              </div>
-            </div>
+  return createPortal(
+    <div className="breeze-modal" onClick={handleCancel}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-modal-title"
+        aria-describedby={description ? 'confirm-modal-description' : undefined}
+        className="breeze-modal__dialog"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="breeze-modal__body">
+          <div className="breeze-modal__icon" aria-hidden="true">
+            <span className="material-symbols-outlined">warning</span>
           </div>
-          <div className="px-6 pb-5 pt-3 flex flex-col sm:flex-row justify-end gap-3 border-t border-[#e7ebf3] dark:border-[#2a3447] bg-[#f8f9fc] dark:bg-[#1a253a] rounded-b-2xl">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="inline-flex justify-center rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] px-4 py-2.5 text-sm font-medium text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              disabled={isConfirming}
-            >
-              {cancelLabel}
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              className="inline-flex justify-center rounded-lg bg-red-600 text-white px-4 py-2.5 text-sm font-semibold shadow-md shadow-red-500/30 hover:bg-red-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
-              disabled={isConfirming}
-            >
-              {isConfirming ? 'Processing...' : confirmLabel}
-            </button>
+          <div>
+            <h3 id="confirm-modal-title" className="breeze-modal__title">
+              {title}
+            </h3>
+            {description ? (
+              <p id="confirm-modal-description" className="breeze-modal__description">
+                {description}
+              </p>
+            ) : null}
           </div>
         </div>
+        <div className="breeze-modal__actions">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="breeze-btn breeze-btn--outline"
+            disabled={isConfirming}
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            className="breeze-btn breeze-btn--danger"
+            disabled={isConfirming}
+          >
+            {isConfirming ? (
+              <>
+                <span className="breeze-btn__spinner" aria-hidden="true" />
+                Processing...
+              </>
+            ) : (
+              confirmLabel
+            )}
+          </button>
+        </div>
       </div>
-    </Fragment>
+    </div>,
+    document.body
   );
 }
 
 export default ConfirmModal;
-

@@ -10,6 +10,7 @@ import '@fontsource/inter/800.css';
 import '@fontsource/inter/900.css';
 import 'material-symbols/outlined.css';
 import './styles/index.css';
+import './styles/breeze.css';
 import Screens from './screens/Screens';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { initPermissionsMiddleware } from './requests/permissions-middleware';

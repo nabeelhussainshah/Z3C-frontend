@@ -1,13 +1,13 @@
 // Packages
-import { useMemo } from 'react';
-import { useAtom, useAtomValue } from 'jotai';
+import { useEffect, useMemo } from 'react';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { NavLink } from 'react-router-dom';
 
 // APIs
 import { LogoutRequest } from '../../requests';
 
 // Utils
-import { auth, loginInfo } from '../../atoms';
+import { auth, loginInfo, refreshToken } from '../../atoms';
 import { decodeString, parseLoginInfo, getNormalizedModulePermissions } from '../../utils';
 
 const navigation = [
@@ -22,9 +22,11 @@ const navigation = [
   { label: 'Audit Logging', icon: 'history', path: '/audit-logging', permissionKey: 'audit' },
 ];
 
-function Sidebar() {
+function Sidebar({ isOpen = false, onClose = () => {} }) {
   const [token, _token] = useAtom(auth);
   const loginInfoValue = useAtomValue(loginInfo);
+  const setLoginInfo = useSetAtom(loginInfo);
+  const setRefreshToken = useSetAtom(refreshToken);
   const decodedToken = useMemo(() => decodeString(token), [token]);
   const user = useMemo(() => parseLoginInfo(loginInfoValue), [loginInfoValue]);
 
@@ -38,41 +40,66 @@ function Sidebar() {
     });
   }, [user]);
 
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    const handleChange = () => {
+      if (media.matches) onClose();
+    };
+    media.addEventListener('change', handleChange);
+    return () => media.removeEventListener('change', handleChange);
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  const clearAllAuthAtoms = () => {
+    _token(null);
+    setLoginInfo(null);
+    setRefreshToken(null);
+  };
+
   const handleLogout = () => {
     if (decodedToken) {
       LogoutRequest(decodedToken)
         .finally(() => {
-          _token(null);
+          clearAllAuthAtoms();
         });
     } else {
-      _token(null);
+      clearAllAuthAtoms();
     }
   };
 
   const LOGO_SECTION = () => (
-    <div className="flex items-center gap-3 mb-8">
-      <div className="bg-primary p-2 rounded-lg text-white">
-        <span className="material-symbols-outlined">shield_with_heart</span>
-      </div>
-      <div className="flex flex-col">
-        <h1 className="text-[#0d121b] dark:text-white text-base font-bold leading-none">ZATCA Hub</h1>
-        <p className="text-[#4c669a] text-xs font-normal">Phase 2 Compliant</p>
-      </div>
-    </div>
+    <NavLink to="/dashboard" className="breeze-sidenav__brand" aria-label="Z3C home" onClick={onClose}>
+      <img
+        src="/images/primary-logo.svg"
+        alt="Z3C"
+        className="breeze-logo max-w-full object-contain object-left"
+      />
+    </NavLink>
   );
 
   const NAVIGATION_SECTION = () => (
-    <nav className="flex flex-col gap-1">
+    <nav className="breeze-sidenav__nav" aria-label="Primary">
       {filteredNavigation.map((item) => (
         <NavLink
           key={item.label}
           to={item.path}
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm cursor-pointer ${isActive
-              ? 'bg-primary/10 text-primary font-semibold'
-              : 'text-[#4c669a] dark:text-[#a0aec0] font-medium hover:bg-gray-100 dark:hover:bg-gray-800'
-            }`
-          }
+          onClick={onClose}
+          className="breeze-sidenav__link"
         >
           <span className="material-symbols-outlined">{item.icon}</span>
           <span>{item.label}</span>
@@ -85,25 +112,39 @@ function Sidebar() {
     <button
       type="button"
       onClick={handleLogout}
-      className="mt-6 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/30 transition-colors"
+      className="breeze-sidenav__logout"
     >
       <span className="material-symbols-outlined">logout</span>
       <span>Logout</span>
     </button>
   );
 
-  const SIDEBAR_CONTENT = () => (
-    <div className="p-6 flex flex-col h-full">
-      {LOGO_SECTION()}
-      {NAVIGATION_SECTION()}
-      {LOGOUT_SECTION()}
-    </div>
-  );
-
   return (
-    <aside className="w-64 border-r border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] hidden lg:flex flex-col">
-      {SIDEBAR_CONTENT()}
-    </aside>
+    <>
+      {isOpen && (
+        <div
+          className="breeze-sidenav-overlay lg:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`breeze-sidenav ${isOpen ? 'is-open' : ''}`}
+        aria-label="Application sidebar"
+      >
+        <button
+          type="button"
+          className="breeze-sidenav__close"
+          onClick={onClose}
+          aria-label="Close navigation"
+        >
+          <span className="material-symbols-outlined">close</span>
+        </button>
+        {LOGO_SECTION()}
+        {NAVIGATION_SECTION()}
+        {LOGOUT_SECTION()}
+      </aside>
+    </>
   );
 }
 

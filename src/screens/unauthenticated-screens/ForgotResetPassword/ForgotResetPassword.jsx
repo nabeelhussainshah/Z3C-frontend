@@ -1,14 +1,21 @@
 // Packages
 import { Fragment, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 // APIs
 import { ForgotPasswordRequest, ResetPasswordRequest } from '../../../requests';
 
 // Utils
-import { showToast, validateSubmissionData } from '../../../utils';
+import { showToast, validateSubmissionData, SUPPORT_EMAIL } from '../../../utils';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const HERO_FEATURES = [
+  { icon: 'verified_user', lines: ['Secure', 'Transactions'] },
+  { icon: 'bolt', lines: ['Real-time', 'Insights'] },
+  { icon: 'bar_chart', lines: ['Smarter', 'Analytics'] },
+  { icon: 'groups', lines: ['Built for', 'Your Growth'] },
+];
 
 function ForgotResetPassword() {
   const navigate = useNavigate();
@@ -188,111 +195,206 @@ function ForgotResetPassword() {
 
   // *********** Render Functions ***********
 
-  const INPUT_CLASSNAME = 'w-full px-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#0d121b] text-sm text-[#0d121b] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-colors';
-
-  const EMAIL_FIELD = () => (
-    <div>
-      <label className="text-xs font-semibold text-[#0d121b] dark:text-white block mb-1">
-        Email
-      </label>
-      <input
-        name="email"
-        type="email"
-        required
-        value={formData.data.email}
-        onChange={handleChangeFormData}
-        autoComplete="email"
-        className={INPUT_CLASSNAME}
-        placeholder="you@example.com"
-      />
-      {formData.errors.email && (
-        <span className="text-xs text-tomato">{formData.errors.email}</span>
-      )}
-    </div>
-  );
-
-  const RESET_FIELDS = () => (
+  const HEADER = () => (
     <Fragment>
-      <div className="rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-[#f8fafc] dark:bg-[#111827] p-3">
-        <p className="text-xs text-[#4c669a] dark:text-gray-400">
-          OTP sent to <span className="font-semibold text-[#0d121b] dark:text-white">{formData.data.email}</span>
-        </p>
-      </div>
-
-      <div>
-        <label className="text-xs font-semibold text-[#0d121b] dark:text-white block mb-1">
-          OTP Code
-        </label>
-        <input
-          name="otpCode"
-          type="text"
-          required
-          value={formData.data.otpCode}
-          onChange={handleChangeFormData}
-          autoComplete="one-time-code"
-          inputMode="numeric"
-          className={INPUT_CLASSNAME}
-          placeholder="Enter OTP code"
-        />
-        {formData.errors.otpCode && (
-          <span className="text-xs text-tomato">{formData.errors.otpCode}</span>
-        )}
-      </div>
-
-      <div>
-        <label className="text-xs font-semibold text-[#0d121b] dark:text-white block mb-1">
-          New Password
-        </label>
-        <input
-          name="newPassword"
-          type="password"
-          required
-          value={formData.data.newPassword}
-          onChange={handleChangeFormData}
-          autoComplete="new-password"
-          className={INPUT_CLASSNAME}
-          placeholder="Enter new password"
-        />
-        {formData.errors.newPassword && (
-          <span className="text-xs text-tomato">{formData.errors.newPassword}</span>
-        )}
-      </div>
-
-      <div>
-        <label className="text-xs font-semibold text-[#0d121b] dark:text-white block mb-1">
-          Confirm Password
-        </label>
-        <input
-          name="confirmPassword"
-          type="password"
-          required
-          value={formData.data.confirmPassword}
-          onChange={handleChangeFormData}
-          autoComplete="new-password"
-          className={INPUT_CLASSNAME}
-          placeholder="Confirm new password"
-        />
-        {formData.errors.confirmPassword && (
-          <span className="text-xs text-tomato">{formData.errors.confirmPassword}</span>
-        )}
-      </div>
+      <header className="breeze-shell breeze-header">
+        <Link to="/login" aria-label="Z3C home">
+          <img src="/images/primary-logo.svg" alt="Z3C" className="breeze-logo" />
+        </Link>
+      </header>
     </Fragment>
   );
 
-  const CONTENT = () => (
+  const HERO = () => (
     <Fragment>
-      <div className="min-h-screen flex items-center justify-center bg-[#f5f6f8] dark:bg-[#0f1323] px-4">
-        <div className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447] p-8 w-full max-w-md shadow-lg">
-          <h1 className="text-2xl font-bold text-[#0d121b] dark:text-white mb-4">
-            {isOtpSend ? 'Set a New Password' : 'Forgot Password'}
-          </h1>
-          <p className="text-sm text-[#4c669a] dark:text-gray-400 mb-4">
-            {isOtpSend
-              ? 'Enter the OTP code sent to your email and choose a new password.'
-              : 'Enter your email address and we will send you an OTP code to reset your password.'}
-          </p>
+      <section className="breeze-hero">
+        <p className="breeze-hero__eyebrow">Fintech solutions for a smarter tomorrow</p>
+        <h1 className="breeze-hero__title">Powering Financial Operations with Clarity</h1>
+        <p className="breeze-hero__lede">
+          Secure, scalable and intuitive platform to manage your transactions, monitor
+          performance and make smarter financial decisions — all in one place.
+        </p>
+        <ul className="breeze-features">
+          {HERO_FEATURES.map((feature) => (
+            <li key={feature.icon} className="breeze-feature">
+              <span className="breeze-feature__badge">
+                <span className="material-symbols-outlined">{feature.icon}</span>
+              </span>
+              <span className="breeze-feature__label">
+                {feature.lines.map((line) => (
+                  <span key={line}>{line}</span>
+                ))}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </Fragment>
+  );
 
-          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
+  const FIELD = ({
+    name,
+    label,
+    icon,
+    placeholder,
+    type = 'text',
+    autoComplete,
+    inputMode,
+    maxLength,
+  }) => {
+    const fieldError = formData.errors[name];
+
+    return (
+      <div className="breeze-field">
+        <label className="breeze-field__label" htmlFor={`forgot-${name}`}>
+          {label}
+        </label>
+        <div className="breeze-field__control">
+          <span className="material-symbols-outlined breeze-field__icon">{icon}</span>
+          <input
+            id={`forgot-${name}`}
+            name={name}
+            type={type}
+            className={`breeze-input${fieldError ? ' breeze-input--invalid' : ''}`}
+            placeholder={placeholder}
+            value={formData.data[name]}
+            onChange={handleChangeFormData}
+            autoComplete={autoComplete}
+            inputMode={inputMode}
+            maxLength={maxLength}
+            aria-invalid={Boolean(fieldError)}
+            aria-describedby={fieldError ? `forgot-${name}-error` : undefined}
+          />
+        </div>
+        {fieldError && (
+          <span className="breeze-field__error" id={`forgot-${name}-error`}>
+            {fieldError}
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const EMAIL_FIELD = () =>
+    FIELD({
+      name: 'email',
+      label: 'Email Address',
+      icon: 'mail',
+      type: 'email',
+      placeholder: 'name@company.com',
+      autoComplete: 'email',
+    });
+
+  const RESET_FIELDS = () => (
+    <Fragment>
+      <div className="breeze-field" style={{ marginBottom: '24px' }}>
+        <div className="rounded-lg border border-[#D0E0F5] bg-[#F0F7FF] p-3 flex items-start gap-2">
+          <span className="material-symbols-outlined text-[#2B7CF5] text-[18px]">info</span>
+          <p className="text-[13px] text-[#2A5488] leading-tight">
+            OTP sent to <span className="font-semibold text-[#01285E]">{formData.data.email}</span>
+          </p>
+        </div>
+      </div>
+
+      {FIELD({
+        name: 'otpCode',
+        label: 'OTP Code',
+        icon: 'pin',
+        placeholder: 'Enter OTP code',
+        autoComplete: 'one-time-code',
+        inputMode: 'numeric',
+      })}
+
+      {FIELD({
+        name: 'newPassword',
+        label: 'New Password',
+        icon: 'lock',
+        type: 'password',
+        placeholder: 'Enter new password',
+        autoComplete: 'new-password',
+      })}
+
+      {FIELD({
+        name: 'confirmPassword',
+        label: 'Confirm Password',
+        icon: 'lock',
+        type: 'password',
+        placeholder: 'Confirm new password',
+        autoComplete: 'new-password',
+      })}
+    </Fragment>
+  );
+
+  const SUBMIT_BUTTON = (label, loadingLabel) => (
+    <Fragment>
+      <button type="submit" className="breeze-btn breeze-btn--primary" disabled={isLoading}>
+        {isLoading ? (
+          <Fragment>
+            <span className="breeze-btn__spinner" />
+            {loadingLabel}
+          </Fragment>
+        ) : (
+          <Fragment>
+            {label}
+            <span className="material-symbols-outlined breeze-btn__icon">arrow_forward</span>
+          </Fragment>
+        )}
+      </button>
+    </Fragment>
+  );
+
+  const CARD_FOOTER = () => (
+    <Fragment>
+      <div className="breeze-options">
+        <Link to="/login" className="breeze-link">
+          Back to sign in
+        </Link>
+
+        {isOtpSend && (
+          <button
+            type="button"
+            onClick={handleUseAnotherEmail}
+            className="breeze-link !text-[#4c669a]"
+          >
+            Use another email
+          </button>
+        )}
+      </div>
+
+      {!isOtpSend && (
+        <p className="breeze-card__footer">
+          Don&apos;t have an account?
+          {SUPPORT_EMAIL ? (
+            <a className="breeze-link" href={`mailto:${SUPPORT_EMAIL}`}>
+              Contact your administrator.
+            </a>
+          ) : (
+            <span className="breeze-link" style={{ cursor: 'default' }}>
+              Contact your administrator.
+            </span>
+          )}
+        </p>
+      )}
+    </Fragment>
+  );
+
+  const AUTH_CARD = () => {
+    const heading = isOtpSend
+      ? {
+          title: 'Set a New Password',
+          subtitle: 'Enter the OTP code sent to your email and choose a new password.',
+        }
+      : {
+          title: 'Forgot Password',
+          subtitle: 'Enter your email address and we will send you an OTP code to reset your password.',
+        };
+
+    return (
+      <Fragment>
+        <div className="breeze-card">
+          <h2 className="breeze-card__title">{heading.title}</h2>
+          <p className="breeze-card__subtitle">{heading.subtitle}</p>
+          <form className="breeze-card__form" onSubmit={handleSubmit} noValidate>
             {/* Hidden decoy fields help prevent aggressive browser autofill on reset flows. */}
             <input
               type="text"
@@ -312,47 +414,40 @@ function ForgotResetPassword() {
             />
 
             {!isOtpSend ? EMAIL_FIELD() : RESET_FIELDS()}
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full text-white bg-primary px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {isLoading
-                ? (isOtpSend ? 'Resetting Password...' : 'Sending OTP...')
-                : (isOtpSend ? 'Reset Password' : 'Send OTP')}
-            </button>
-          </form>
-
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/login')}
-              className="text-sm text-primary hover:underline"
-            >
-              Back to sign in
-            </button>
-
-            {isOtpSend && (
-              <button
-                type="button"
-                onClick={handleUseAnotherEmail}
-                className="text-sm text-[#4c669a] dark:text-gray-400 hover:underline"
-              >
-                Use another email
-              </button>
+            {SUBMIT_BUTTON(
+              isOtpSend ? 'Reset Password' : 'Send OTP',
+              isOtpSend ? 'Resetting Password...' : 'Sending OTP...'
             )}
-          </div>
+          </form>
+          {CARD_FOOTER()}
         </div>
+      </Fragment>
+    );
+  };
+
+  const FOOTER = () => (
+    <Fragment>
+      <footer className="breeze-shell breeze-footer">
+        © {new Date().getFullYear()} Z3C. All rights reserved.
+      </footer>
+    </Fragment>
+  );
+
+  const LAYOUT = () => (
+    <Fragment>
+      <div className="breeze-auth">
+        <div className="breeze-auth__backdrop" aria-hidden="true" />
+        {HEADER()}
+        <main className="breeze-shell breeze-main">
+          {HERO()}
+          {AUTH_CARD()}
+        </main>
+        {FOOTER()}
       </div>
     </Fragment>
   );
 
-  return (
-    <div id="forgot-reset-password">
-      {CONTENT()}
-    </div>
-  );
+  return LAYOUT();
 }
 
 export default ForgotResetPassword;

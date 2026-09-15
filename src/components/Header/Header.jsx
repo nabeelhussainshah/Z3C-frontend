@@ -1,5 +1,6 @@
 // Packages
 import { Fragment, useMemo } from 'react';
+import { NavLink } from 'react-router-dom';
 import { useAtomValue } from 'jotai';
 
 // Atoms
@@ -9,7 +10,7 @@ import { loginInfo } from '../../atoms';
 import { useTheme } from '../../contexts/ThemeContext';
 import { decodeString } from '../../utils';
 
-function Header() {
+function Header({ onMenuOpen = () => {} }) {
   const { theme, toggleTheme } = useTheme();
   const loginInfoValue = useAtomValue(loginInfo);
 
@@ -24,66 +25,70 @@ function Header() {
   }, [loginInfoValue]);
 
   const userName = user?.username || user?.fullName || user?.name || 'Guest';
-
-  const SEARCH_SECTION = () => (
-    <div className="flex items-center gap-6 flex-1">
-      <label className="flex flex-col min-w-[320px] max-w-md">
-        <div className="flex w-full items-stretch rounded-lg h-10 bg-[#f0f2f5] dark:bg-[#20293a]">
-          <div className="text-[#4c669a] flex items-center justify-center px-3">
-            <span className="material-symbols-outlined text-[20px]">search</span>
-          </div>
-          <input
-            className="w-full bg-transparent border-none focus:ring-0 text-sm placeholder:text-[#4c669a] text-[#0d121b] dark:text-white"
-            placeholder="Search invoices, certificates, or logs..."
-          />
-        </div>
-      </label>
-    </div>
-  );
+  const userRole = user?.role || user?.userRole || 'Administrator';
 
   const ACTIONS_SECTION = () => (
-    <div className="flex items-center gap-4">
+    <div className="breeze-topbar__actions">
+      <button type="button" className="breeze-icon-btn hidden sm:grid" aria-label="Notifications">
+        <span className="material-symbols-outlined">notifications</span>
+        <span className="breeze-icon-btn__badge" aria-hidden="true" />
+      </button>
+      <button type="button" className="breeze-icon-btn hidden sm:grid" aria-label="Settings">
+        <span className="material-symbols-outlined">settings</span>
+      </button>
       <button
         type="button"
         onClick={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          toggleTheme()
+          e.preventDefault();
+          e.stopPropagation();
+          toggleTheme();
         }}
-        className="p-2 rounded-lg bg-[#f0f2f5] dark:bg-[#20293a] text-[#0d121b] dark:text-[#f8f9fc] hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        className="breeze-icon-btn"
         aria-label="Toggle theme"
       >
         <span className="material-symbols-outlined">
           {theme === 'light' ? 'dark_mode' : 'light_mode'}
         </span>
       </button>
-      <div className="h-8 w-[1px] bg-[#e7ebf3] dark:border-[#2a3447] mx-2"></div>
-      <div className="flex items-center gap-3">
-        <div className="text-right hidden sm:block">
-          <p className="text-sm font-bold leading-tight">{userName}</p>
-          <p className="text-[11px] text-[#4c669a] dark:text-[#a0aec0]">Administrator</p>
+      <div className="breeze-topbar__divider" aria-hidden="true" />
+      <div className="breeze-user">
+        <div className="breeze-user__meta hidden sm:block">
+          <p className="breeze-user__name">{userName}</p>
+          <p className="breeze-user__role">{userRole}</p>
         </div>
         <div
-          className="bg-center bg-no-repeat aspect-square bg-cover rounded-full border-2 border-primary/20 h-10 w-10"
+          className="breeze-user__avatar"
           style={{
             backgroundImage: `url("${user?.profilePicture || '/images/profile_pic.png'}")`,
           }}
           role="img"
           aria-label="User avatar"
-        ></div>
+        />
       </div>
     </div>
   );
 
   const HEADER_CONTENT = () => (
     <Fragment>
-      {/* {SEARCH_SECTION()} */}
+      <div className="breeze-topbar__brand gap-2">
+        <button
+          type="button"
+          className="breeze-icon-btn lg:hidden"
+          onClick={onMenuOpen}
+          aria-label="Open navigation"
+        >
+          <span className="material-symbols-outlined">menu</span>
+        </button>
+        <NavLink to="/dashboard" className="lg:hidden" aria-label="Z3C home">
+          <img src="/images/primary-logo.svg" alt="Z3C" className="breeze-logo" />
+        </NavLink>
+      </div>
       {ACTIONS_SECTION()}
     </Fragment>
   );
 
   return (
-    <header className="flex items-center justify-end border-b border-[#e7ebf3] dark:border-[#2a3447] bg-white/80 dark:bg-[#161f30]/80 backdrop-blur-md px-8 py-4 sticky top-0 z-10">
+    <header className="breeze-topbar sticky top-0 z-20">
       {HEADER_CONTENT()}
     </header>
   );

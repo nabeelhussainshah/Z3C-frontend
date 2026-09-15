@@ -3,6 +3,10 @@ export const BASE_URL = import.meta.env.VITE_BASE_URL ?? 'http://localhost:5555/
 
 export const ENCODER = "Z@tca_da$hb0arD_2026";
 
+// Mailbox behind "Contact your administrator" on the login screen. When unset the
+// text renders as plain copy instead of a dead mailto link.
+export const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || '';
+
 // Pagination page size options for listing views (React Table)
 export const PAGINATION_PAGE_SIZES = [20, 50, 100];
 

@@ -4,11 +4,11 @@
 @variant dark (.dark &);
 
 @theme {
-  --color-primary: #607AFB;
-  --color-background-light: #f5f6f8;
-  --color-background-dark: #0f1323;
-  --color-text-muted: #4c669a;
-  --color-border-light: #e7ebf3;
+  --color-primary: #2B7CF5;
+  --color-background-light: #D7E7ED;
+  --color-background-dark: #0c1828;
+  --color-text-muted: #33639B;
+  --color-border-light: #C5DCE8;
   --color-border-dark: #2a3447;
   --color-tomato: #ff6347;
   
@@ -30,8 +30,8 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #0d121b;
-  background-color: #f5f6f8;
+  color: #454D58;
+  background-color: #D7E7ED;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

@@ -2,6 +2,8 @@
 
 An admin dashboard built with React for ZATCA (Zakat, Tax and Customs Authority) compliance and management.
 
+The UI is styled with a custom theme named **Breeze** (`src/styles/breeze.css`), loaded after Tailwind in `src/main.jsx`. Component classes use the `breeze-` prefix.
+
 ### Installation:
 
 ```bash
@@ -41,6 +43,8 @@ An admin dashboard built with React for ZATCA (Zakat, Tax and Customs Authority)
  - **Vite (ver 7.2)**
 
  - **Tailwind CSS (ver 4.1)**
+
+ - **Breeze** — custom UI theme (`src/styles/breeze.css`)
 
  - **PostCSS (ver 8.5)**
 
