@@ -6,6 +6,11 @@ function formatDelta(value) {
   return `${sign}${num}%`;
 }
 
+function deltaTone(value) {
+  if (value == null || Number.isNaN(parseFloat(value))) return 'is-neutral';
+  return parseFloat(value) >= 0 ? 'is-up' : 'is-down';
+}
+
 function buildStats(apiData) {
   // API shape: totalInvoices, clearedInvoices, rejectionRate each = { current, previous, deltaPercent }
   apiData = apiData?.data ?? apiData;
@@ -16,63 +21,60 @@ function buildStats(apiData) {
   const rejectionRate = apiData?.rejectionRate?.current ?? apiData?.rejection_rate?.current ?? null;
   const rejectionRateDelta = apiData?.rejectionRate?.deltaPercent ?? apiData?.rejection_rate?.deltaPercent ?? null;
 
-  const fmtDeltaColor = (val) => {
-    if (val == null) return '#4c669a';
-    return parseFloat(val) >= 0 ? '#07883b' : '#e73908';
-  };
-
   return [
     {
       title: 'Total Invoices',
       value: total != null ? Number(total).toLocaleString() : '—',
       delta: formatDelta(totalDelta),
-      deltaColor: fmtDeltaColor(totalDelta),
+      deltaTone: deltaTone(totalDelta),
       icon: 'receipt_long',
-      bar: total != null ? `w-[${Math.min(100, Math.round((total / 20000) * 100))}%]` : 'w-[0%]',
+      barPct: total != null ? Math.min(100, Math.round((total / 20000) * 100)) : 0,
     },
     {
       title: 'Cleared',
       value: cleared != null ? Number(cleared).toLocaleString() : '—',
       delta: formatDelta(clearedDelta),
-      deltaColor: fmtDeltaColor(clearedDelta),
+      deltaTone: deltaTone(clearedDelta),
       icon: 'task_alt',
-      bar: cleared != null && total != null
-        ? `w-[${Math.min(100, Math.round((cleared / Math.max(total, 1)) * 100))}%]`
-        : 'w-[0%]',
-      contrast: 'bg-green-500',
+      iconTone: 'success',
+      barTone: 'success',
+      barPct: cleared != null && total != null
+        ? Math.min(100, Math.round((cleared / Math.max(total, 1)) * 100))
+        : 0,
     },
     {
       title: 'Rejection Rate',
       value: rejectionRate != null ? `${parseFloat(rejectionRate).toFixed(2)}%` : '—',
       delta: formatDelta(rejectionRateDelta),
-      deltaColor: fmtDeltaColor(
-        rejectionRateDelta != null ? -parseFloat(rejectionRateDelta) : null
-      ),
+      deltaTone: deltaTone(rejectionRateDelta != null ? -parseFloat(rejectionRateDelta) : null),
       icon: 'warning',
-      bar: rejectionRate != null ? `w-[${Math.min(100, Math.ceil(parseFloat(rejectionRate)))}%]` : 'w-[0%]',
-      contrast: 'bg-red-500',
+      iconTone: 'danger',
+      barTone: 'danger',
+      barPct: rejectionRate != null ? Math.min(100, Math.ceil(parseFloat(rejectionRate))) : 0,
     },
   ];
 }
 
 const SKELETON_CARD = () => (
-  <article className="bg-white dark:bg-[#161f30] rounded-xl p-6 border border-[#e7ebf3] dark:border-[#2a3447] shadow-sm animate-pulse">
-    <div className="flex justify-between items-start mb-4">
-      <div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded" />
-      <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded" />
+  <article className="breeze-kpi is-skeleton" aria-hidden="true">
+    <div className="breeze-kpi__head">
+      <div className="breeze-skel h-4 w-28" />
+      <div className="breeze-skel h-9 w-9 rounded-xl" />
     </div>
-    <div className="flex items-baseline gap-2">
-      <div className="h-7 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
-      <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded" />
+    <div className="breeze-kpi__value-row">
+      <div className="breeze-skel h-7 w-20" />
+      <div className="breeze-skel h-4 w-12" />
     </div>
-    <div className="mt-4 h-1 bg-gray-100 dark:bg-gray-800 rounded-full" />
+    <div className="breeze-kpi__track">
+      <div className="breeze-skel h-full w-2/3" />
+    </div>
   </article>
 );
 
 function KpiStats({ stats: apiData, loading }) {
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="breeze-kpi-grid">
         {[0, 1, 2].map((i) => <SKELETON_CARD key={i} />)}
       </div>
     );
@@ -81,30 +83,33 @@ function KpiStats({ stats: apiData, loading }) {
   const stats = buildStats(apiData);
 
   const STAT_CARD = (stat) => (
-    <article
-      key={stat.title}
-      className="bg-white dark:bg-[#161f30] rounded-xl p-6 border border-[#e7ebf3] dark:border-[#2a3447] shadow-sm"
-    >
-      <div className="flex justify-between items-start mb-4">
-        <p className="text-[#4c669a] text-sm font-medium">{stat.title}</p>
-        <span className="material-symbols-outlined text-primary">{stat.icon}</span>
+    <article key={stat.title} className="breeze-kpi">
+      <div className="breeze-kpi__head">
+        <p className="breeze-kpi__label">{stat.title}</p>
+        <span
+          className={`breeze-kpi__icon${stat.iconTone ? ` breeze-kpi__icon--${stat.iconTone}` : ''}`}
+          aria-hidden="true"
+        >
+          <span className="material-symbols-outlined">{stat.icon}</span>
+        </span>
       </div>
-      <div className="flex items-baseline gap-2">
-        <h3 className="text-[#0d121b] dark:text-white text-2xl font-black">{stat.value}</h3>
+      <div className="breeze-kpi__value-row">
+        <h3 className="breeze-kpi__value">{stat.value}</h3>
         {stat.delta && (
-          <span className="text-sm font-bold" style={{ color: stat.deltaColor }}>
-            {stat.delta}
-          </span>
+          <span className={`breeze-kpi__delta ${stat.deltaTone}`}>{stat.delta}</span>
         )}
       </div>
-      <div className="mt-4 h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-        <div className={`h-full ${stat.contrast ?? 'bg-primary'} ${stat.bar}`} />
+      <div className="breeze-kpi__track">
+        <div
+          className={`breeze-kpi__bar${stat.barTone ? ` breeze-kpi__bar--${stat.barTone}` : ''}`}
+          style={{ width: `${stat.barPct}%` }}
+        />
       </div>
     </article>
   );
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="breeze-kpi-grid">
       {stats.map((stat) => STAT_CARD(stat))}
     </div>
   );

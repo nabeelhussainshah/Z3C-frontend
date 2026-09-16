@@ -60,53 +60,54 @@ function PageHeader({ from, to, onDateChange }) {
     from && to ? `${formatDisplayDate(from)} – ${formatDisplayDate(to)}` : 'Select date range';
 
   const TITLE_SECTION = () => (
-    <div className="space-y-1">
-      <h2 className="text-[#0d121b] dark:text-white text-3xl font-black tracking-tight">
-        Zatca Overview
-      </h2>
-      <p className="text-[#4c669a] text-base">Real-time monitoring of ZATCA Phase 2 electronic invoicing</p>
+    <div>
+      <h2 className="breeze-page__title">Zatca Overview</h2>
+      <p className="breeze-page__lede">
+        Real-time monitoring of ZATCA Phase 2 electronic invoicing
+      </p>
     </div>
   );
 
   const DATE_PICKER_DROPDOWN = () => (
-    <div
-      ref={pickerRef}
-      className="absolute right-0 top-12 z-50 bg-white dark:bg-[#161f30] border border-[#e7ebf3] dark:border-[#2a3447] rounded-xl shadow-lg p-4 w-72"
-    >
-      <p className="text-xs font-bold text-[#4c669a] uppercase tracking-wider mb-3">Date Range</p>
+    <div className="breeze-panel left-0 right-0 sm:left-auto w-auto sm:w-72">
+      <p className="breeze-panel__label">Date Range</p>
       <div className="space-y-3">
         <div>
-          <label className="block text-xs font-medium text-[#4c669a] mb-1">From</label>
+          <label className="breeze-field__label" htmlFor="dashboard-date-from">From</label>
           <input
+            id="dashboard-date-from"
             type="date"
             value={draftFrom}
             max={draftTo || undefined}
             onChange={(e) => _draftFrom(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#1a253a] text-[#0d121b] dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+            className="breeze-form-input"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-[#4c669a] mb-1">To</label>
+          <label className="breeze-field__label" htmlFor="dashboard-date-to">To</label>
           <input
+            id="dashboard-date-to"
             type="date"
             value={draftTo}
             min={draftFrom || undefined}
             onChange={(e) => _draftTo(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#1a253a] text-[#0d121b] dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+            className="breeze-form-input"
           />
         </div>
       </div>
-      <div className="flex gap-2 mt-4">
+      <div className="flex gap-2 pt-4">
         <button
+          type="button"
           onClick={() => _pickerOpen(false)}
-          className="flex-1 px-3 py-2 text-sm font-bold rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] text-[#4c669a] hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          className="breeze-btn breeze-btn--outline breeze-btn--inline flex-1"
         >
           Cancel
         </button>
         <button
+          type="button"
           onClick={handleApply}
           disabled={!draftFrom || !draftTo}
-          className="flex-1 px-3 py-2 text-sm font-bold rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="breeze-btn breeze-btn--primary breeze-btn--inline flex-1"
         >
           Apply
         </button>
@@ -115,14 +116,19 @@ function PageHeader({ from, to, onDateChange }) {
   );
 
   const ACTIONS_SECTION = () => (
-    <div className="flex gap-3">
-      <div className="relative">
+    <div className="breeze-page-actions">
+      <div ref={pickerRef} className="relative w-full sm:w-auto">
         <button
+          type="button"
           onClick={() => _pickerOpen((v) => !v)}
-          className="flex items-center gap-2 px-4 h-10 rounded-lg bg-white dark:bg-[#161f30] border border-[#e7ebf3] dark:border-[#2a3447] text-[#0d121b] dark:text-white text-sm font-bold hover:bg-gray-50 transition-colors"
+          aria-expanded={pickerOpen}
+          aria-haspopup="dialog"
+          className="breeze-btn breeze-btn--outline breeze-btn--inline w-full sm:w-auto"
         >
-          <span className="material-symbols-outlined text-[18px]">calendar_today</span>
-          <span>{dateLabel}</span>
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+            calendar_today
+          </span>
+          <span className="truncate min-w-0">{dateLabel}</span>
         </button>
         {pickerOpen && DATE_PICKER_DROPDOWN()}
       </div>
@@ -130,9 +136,11 @@ function PageHeader({ from, to, onDateChange }) {
         <button
           type="button"
           onClick={() => navigate('/invoices/new')}
-          className="flex items-center gap-2 px-4 h-10 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-all shadow-md"
+          className="breeze-btn breeze-btn--primary breeze-btn--inline w-full sm:w-auto"
         >
-          <span className="material-symbols-outlined text-[18px]">add</span>
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+            add
+          </span>
           <span>New Submission</span>
         </button>
       )}
@@ -140,7 +148,7 @@ function PageHeader({ from, to, onDateChange }) {
   );
 
   return (
-    <div className="flex flex-wrap justify-between items-end gap-4">
+    <div className="breeze-toolbar items-start">
       <Fragment>
         {TITLE_SECTION()}
         {ACTIONS_SECTION()}

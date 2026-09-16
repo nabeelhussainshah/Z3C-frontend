@@ -75,18 +75,14 @@ function Dashboard() {
   // *********** Render Functions ***********
 
   const MAIN_CONTENT = () => (
-    <div className="p-8 space-y-8">
+    <div className="breeze-page flex-1">
       <PageHeader
         from={dateRange.from}
         to={dateRange.to}
         onDateChange={(from, to) => _dateRange({ from, to })}
       />
       <KpiStats stats={kpiStats} loading={loadingKpi} />
-      <div className="grid grid-cols-1 xl:grid-cols-1 gap-8">
-        <div className="xl:col-span-2">
-          <TrendChart trends={trends} loading={loadingTrends} />
-        </div>
-      </div>
+      <TrendChart trends={trends} loading={loadingTrends} />
       <RecentActivity
         submissions={recentSubmissions}
         loading={loadingRecent}
@@ -104,7 +100,7 @@ function Dashboard() {
   );
 
   return (
-    <div id="dashboard">
+    <div id="dashboard" className="flex min-h-0 flex-1 flex-col">
       {CONTENT()}
     </div>
   );

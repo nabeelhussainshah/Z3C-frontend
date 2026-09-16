@@ -1,6 +1,8 @@
 // Packages
-import { Fragment } from 'react';
+import { Fragment, useMemo } from 'react';
 import { Chart } from 'react-google-charts';
+
+import { useTheme } from '../../contexts/ThemeContext';
 
 /**
  * Transforms the API trends array into Google Charts ColumnChart format.
@@ -24,7 +26,7 @@ function buildChartData(trends) {
         const month = d.toLocaleString('default', { month: 'short' });
         label = `${day} ${month}`;
       }
-    } catch (_) { /* keep raw */ }
+    } catch { /* keep raw */ }
 
     const cleared = Number(t.cleared ?? t.clearedCount ?? 0);
     if (hasReported) {
@@ -36,52 +38,61 @@ function buildChartData(trends) {
   return [header, ...rows];
 }
 
-const options = {
-  title: '',
-  chartArea: {
-    width: '75%',
-    height: '70%',
-    left: 60,
-    top: 20,
-    right: 20,
-    bottom: 50,
-  },
-  hAxis: {
+function getChartOptions(isDark) {
+  const axis = isDark ? '#9bb6d4' : '#33639B';
+  const grid = isDark ? 'rgba(255,255,255,0.08)' : '#DAE7F7';
+
+  return {
     title: '',
-    textStyle: { color: '#4c669a', fontSize: 10, fontName: 'Inter' },
-    gridlines: { color: 'transparent' },
-  },
-  vAxis: {
-    title: '',
-    textStyle: { color: '#4c669a', fontSize: 10, fontName: 'Inter' },
-    gridlines: { color: '#e7ebf3' },
-  },
-  legend: { position: 'none' },
-  colors: ['#607AFB', '#93C5FD'],
-  backgroundColor: 'transparent',
-  isStacked: false,
-  bar: { groupWidth: '75%' },
-};
+    chartArea: {
+      width: '78%',
+      height: '70%',
+      left: 48,
+      top: 16,
+      right: 16,
+      bottom: 48,
+    },
+    hAxis: {
+      title: '',
+      textStyle: { color: axis, fontSize: 10, fontName: 'Inter' },
+      gridlines: { color: 'transparent' },
+    },
+    vAxis: {
+      title: '',
+      textStyle: { color: axis, fontSize: 10, fontName: 'Inter' },
+      gridlines: { color: grid },
+      baselineColor: grid,
+    },
+    legend: { position: 'none' },
+    colors: ['#2B7CF5', '#B4D7EE'],
+    backgroundColor: 'transparent',
+    isStacked: false,
+    bar: { groupWidth: '68%' },
+  };
+}
 
 function TrendChart({ trends, loading }) {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const chartData = buildChartData(trends);
   const hasReported = chartData && chartData[0]?.length === 3;
+  const options = useMemo(() => getChartOptions(isDark), [isDark]);
 
   const HEADER_SECTION = () => (
-    <div className="flex items-center justify-between mb-8">
+    <div className="breeze-chart-card__header">
       <div>
-        <h4 className="text-lg font-bold">Submission Trends</h4>
-        <p className="text-sm text-[#4c669a]">Daily submission volume</p>
+        <h4 className="breeze-chart-card__title">Submission Trends</h4>
+        <p className="breeze-chart-card__lede">Daily submission volume</p>
       </div>
-      <div className="flex gap-2">
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full bg-primary" />
-          <span className="text-xs font-medium">Cleared</span>
+      <div className="breeze-legend">
+        <div className="breeze-legend__item">
+          <span className="breeze-legend__dot breeze-legend__dot--cleared" aria-hidden="true" />
+          <span>Cleared</span>
         </div>
         {hasReported && (
-          <div className="flex items-center gap-1.5 ml-2">
-            <span className="w-3 h-3 rounded-full bg-blue-200" />
-            <span className="text-xs font-medium">Reported</span>
+          <div className="breeze-legend__item">
+            <span className="breeze-legend__dot breeze-legend__dot--reported" aria-hidden="true" />
+            <span>Reported</span>
           </div>
         )}
       </div>
@@ -91,26 +102,26 @@ function TrendChart({ trends, loading }) {
   const CHART_SECTION = () => {
     if (loading) {
       return (
-        <div className="h-[300px] w-full flex items-center justify-center animate-pulse">
-          <div className="w-full h-full bg-gray-100 dark:bg-gray-800 rounded" />
+        <div className="breeze-chart-card__empty" aria-hidden="true">
+          <div className="breeze-skel h-full w-full rounded-xl" />
         </div>
       );
     }
 
     if (!chartData) {
       return (
-        <div className="h-[300px] w-full flex items-center justify-center text-[#4c669a] text-sm">
+        <div className="breeze-chart-card__empty">
           No trend data available
         </div>
       );
     }
 
     return (
-      <div className="h-[300px] w-full">
+      <div className="breeze-chart-card__canvas">
         <Chart
           chartType="ColumnChart"
           width="100%"
-          height="300px"
+          height="100%"
           data={chartData}
           options={options}
         />
@@ -119,7 +130,7 @@ function TrendChart({ trends, loading }) {
   };
 
   return (
-    <div className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447] p-6 shadow-sm overflow-hidden">
+    <div className="breeze-chart-card">
       <Fragment>
         {HEADER_SECTION()}
         {CHART_SECTION()}
