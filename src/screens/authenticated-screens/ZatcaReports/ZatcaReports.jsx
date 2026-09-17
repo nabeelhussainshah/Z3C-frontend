@@ -9,6 +9,25 @@ import { auth } from '../../../atoms';
 import { Footer } from '../../../components';
 import { showToast, decodeString } from '../../../utils';
 
+const STATUS_GUIDE = [
+  {
+    label: 'All (Cleared or Reported)',
+    description: 'Invoices that are either cleared or reported to ZATCA',
+  },
+  {
+    label: 'Cleared',
+    description: 'Only invoices with ZATCA clearance status',
+  },
+  {
+    label: 'Reported',
+    description: 'Only invoices that have been reported to ZATCA',
+  },
+  {
+    label: 'Not Reported',
+    description: 'Invoices that have not been cleared or reported (no ZATCA response)',
+  },
+];
+
 function ZatcaReports() {
   const authValue = useAtomValue(auth);
   const decodedToken = useMemo(() => decodeString(authValue), [authValue]);
@@ -70,150 +89,174 @@ function ZatcaReports() {
 
   // *********** Render Functions ***********
   const PAGE_HEADER = () => (
-    <div className="flex flex-wrap justify-between items-end gap-3 mb-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-[#0d121b] dark:text-white text-3xl font-black leading-tight">
-          ZATCA Invoice Reporting
-        </h1>
-        <p className="text-[#4c669a] dark:text-gray-400 text-base font-normal">
-          Export invoice reports by date range and ZATCA status.
-        </p>
-      </div>
+    <div>
+      <h2 className="breeze-page__title">ZATCA Invoice Reporting</h2>
+      <p className="breeze-page__lede">
+        Export invoice reports by date range and ZATCA status.
+      </p>
     </div>
   );
 
   const FILTERS_CARD = () => (
-    <section className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447]">
-      <div className="p-6 space-y-6">
-        <h3 className="text-[#0d121b] dark:text-white text-base font-bold flex items-center gap-2">
-          <span className="size-2 rounded-full bg-primary"></span>
-          Export Filters
-        </h3>
-
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-end gap-4">
-          <div className="flex-1 flex flex-col gap-2">
-            <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400">
-              From Date <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              required
-              className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] bg-white text-sm text-[#0d121b] focus:ring-2 focus:ring-primary focus:border-primary transition-colors dark:bg-[#161f30] dark:border-[#2a3447] dark:text-white"
-              value={filters.fromDate}
-              onChange={(e) =>
-                _filters((prev) => ({
-                  ...prev,
-                  fromDate: e.target.value,
-                }))
-              }
-            />
+    <div className="breeze-form-card">
+      <form
+        className="breeze-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleDownloadReport();
+        }}
+        noValidate
+      >
+        <section className="breeze-form-section">
+          <div className="breeze-form-section__header">
+            <span className="breeze-form-section__badge" aria-hidden="true">
+              <span className="material-symbols-outlined">filter_alt</span>
+            </span>
+            <div>
+              <h3 className="breeze-form-section__title">Export Filters</h3>
+              <p className="breeze-form-section__lede">
+                Choose a date range and status, then download an Excel report organized by month.
+              </p>
+            </div>
           </div>
 
-          <div className="flex-1 flex flex-col gap-2">
-            <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400">
-              To Date <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              required
-              className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] bg-white text-sm text-[#0d121b] focus:ring-2 focus:ring-primary focus:border-primary transition-colors dark:bg-[#161f30] dark:border-[#2a3447] dark:text-white"
-              value={filters.toDate}
-              onChange={(e) =>
-                _filters((prev) => ({
-                  ...prev,
-                  toDate: e.target.value,
-                }))
-              }
-            />
-          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5 items-end">
+            <div className="breeze-form-field">
+              <label className="breeze-field__label" htmlFor="zatca-report-from-date">
+                From Date
+                <span className="breeze-form-required" aria-hidden="true"> *</span>
+              </label>
+              <input
+                id="zatca-report-from-date"
+                type="date"
+                required
+                className="breeze-form-input"
+                value={filters.fromDate}
+                onChange={(e) =>
+                  _filters((prev) => ({
+                    ...prev,
+                    fromDate: e.target.value,
+                  }))
+                }
+              />
+            </div>
 
-          <div className="flex-1 flex flex-col gap-2">
-            <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400">
-              ZATCA Status
-            </label>
-            <select
-              className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] bg-white pr-8 text-sm text-[#0d121b] focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none dark:bg-[#161f30] dark:border-[#2a3447] dark:text-white"
-              value={filters.zatcaStatus || ''}
-              onChange={(e) =>
-                _filters((prev) => ({
-                  ...prev,
-                  zatcaStatus: e.target.value,
-                }))
-              }
-            >
-              <option value="" disabled>
+            <div className="breeze-form-field">
+              <label className="breeze-field__label" htmlFor="zatca-report-to-date">
+                To Date
+                <span className="breeze-form-required" aria-hidden="true"> *</span>
+              </label>
+              <input
+                id="zatca-report-to-date"
+                type="date"
+                required
+                className="breeze-form-input"
+                value={filters.toDate}
+                onChange={(e) =>
+                  _filters((prev) => ({
+                    ...prev,
+                    toDate: e.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            <div className="breeze-form-field">
+              <label className="breeze-field__label" htmlFor="zatca-report-status">
                 ZATCA Status
-              </option>
-              <option value="ALL">All (Cleared or Reported)</option>
-              <option value="CLEARED">Cleared</option>
-              <option value="REPORTED">Reported</option>
-              <option value="NOT_REPORTED">Not Reported</option>
-            </select>
+              </label>
+              <select
+                id="zatca-report-status"
+                className="breeze-select"
+                value={filters.zatcaStatus || ''}
+                onChange={(e) =>
+                  _filters((prev) => ({
+                    ...prev,
+                    zatcaStatus: e.target.value,
+                  }))
+                }
+              >
+                <option value="" disabled>
+                  ZATCA Status
+                </option>
+                <option value="ALL">All (Cleared or Reported)</option>
+                <option value="CLEARED">Cleared</option>
+                <option value="REPORTED">Reported</option>
+                <option value="NOT_REPORTED">Not Reported</option>
+              </select>
+            </div>
+
+            <div className="breeze-form-field">
+              <button
+                type="submit"
+                className="breeze-btn breeze-btn--primary breeze-btn--inline w-full min-w-0"
+                disabled={isLoading || !filters.fromDate || !filters.toDate}
+              >
+                {isLoading ? (
+                  <Fragment>
+                    <span className="breeze-btn__spinner" aria-hidden="true" />
+                    Downloading...
+                  </Fragment>
+                ) : (
+                  <Fragment>
+                    <span className="material-symbols-outlined text-[18px]">download</span>
+                    Download
+                  </Fragment>
+                )}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="breeze-form-section">
+          <div className="breeze-form-section__header">
+            <span className="breeze-form-section__badge" aria-hidden="true">
+              <span className="material-symbols-outlined">info</span>
+            </span>
+            <div>
+              <h3 className="breeze-form-section__title">Status Options</h3>
+              <p className="breeze-form-section__lede">
+                This report exports invoices based on the selected filters. The exported file
+                is organized by month with a separate sheet for each month.
+              </p>
+            </div>
           </div>
 
-          <div className="w-full lg:w-auto flex lg:inline-flex justify-stretch lg:justify-end">
-            <button
-              type="button"
-              className="w-full lg:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-bold shadow-sm hover:bg-[#041632] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0b2551] disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoading || !filters.fromDate || !filters.toDate}
-              onClick={handleDownloadReport}
-            >
-              <span className="material-symbols-outlined text-[18px]">download</span>
-              {isLoading ? 'DOWNLOADING...' : 'DOWNLOAD'}
-            </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {STATUS_GUIDE.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-[12px] border border-[var(--z3c-border-card)] bg-white/40 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]"
+              >
+                <p className="m-0 text-[13px] font-semibold text-[var(--z3c-heading)]">
+                  {item.label}
+                </p>
+                <p className="mt-1 mb-0 text-[12.5px] leading-[18px] text-[var(--z3c-subtle)]">
+                  {item.description}
+                </p>
+              </div>
+            ))}
           </div>
-        </div>
-
-        <div className="pt-2 border-t border-dashed border-[#e7ebf3] dark:border-[#2a3447] text-xs text-[#4c669a] dark:text-gray-400 space-y-2">
-          <p>
-            <span className="font-bold text-[#0d121b] dark:text-white">Note:</span>{' '}
-            This report will export invoices based on the selected filters. The exported
-            file will be organized by month with separate sheets for each month.
-          </p>
-          <div className="space-y-1">
-            <p className="font-bold text-[#0d121b] dark:text-white">Status Options:</p>
-            <p>
-              <span className="font-semibold">All (Cleared or Reported):</span> Invoices
-              that are either cleared or reported to ZATCA
-            </p>
-            <p>
-              <span className="font-semibold">Cleared:</span> Only invoices with ZATCA
-              clearance status
-            </p>
-            <p>
-              <span className="font-semibold">Reported:</span> Only invoices that have
-              been reported to ZATCA
-            </p>
-            <p>
-              <span className="font-semibold">Not Reported:</span> Invoices that have not
-              been cleared or reported (no ZATCA response)
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-
-  const MAIN_CONTENT = () => (
-    <div className="p-8 space-y-8">
-      {PAGE_HEADER()}
-      {FILTERS_CARD()}
+        </section>
+      </form>
     </div>
   );
 
   const CONTENT = () => (
     <Fragment>
-      {MAIN_CONTENT()}
+      <div className="breeze-page flex-1">
+        {PAGE_HEADER()}
+        {FILTERS_CARD()}
+      </div>
       <Footer />
     </Fragment>
   );
 
   return (
-    <div>
+    <div id="zatca-reports" className="flex min-h-0 flex-1 flex-col">
       {CONTENT()}
     </div>
   );
 }
 
 export default ZatcaReports;
-

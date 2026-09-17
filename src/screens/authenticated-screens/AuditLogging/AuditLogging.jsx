@@ -334,8 +334,8 @@ function AuditLogging() {
   }, [authValue, pagination.pageIndex, pagination.pageSize, appliedSearchQuery, sorting, fromDate, toDate, selectedUserId, selectedModule, selectedAction, reloadKey]);
 
   const TableLoadingSkeleton = () => (
-    <div className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447] shadow-sm overflow-hidden">
-      <div className="px-6 py-8 text-center text-sm text-[#4c669a]">
+    <div className="breeze-table-card">
+      <div className="px-6 py-8 text-center text-sm text-[var(--z3c-subtle)]">
         <div className="flex items-center justify-center gap-2">
           <span className="material-symbols-outlined animate-spin">sync</span>
           Loading audit logs...
@@ -345,14 +345,14 @@ function AuditLogging() {
   );
 
   const PAGE_HEADER = () => (
-    <div className="flex flex-wrap justify-between items-end gap-4">
-      <div className="space-y-1">
-        <h2 className="text-[#0d121b] dark:text-white text-3xl font-black tracking-tight">
-          Audit Logging
-        </h2>
-        <p className="text-[#4c669a] text-base">View and filter system audit logs</p>
-      </div>
+    <div>
+      <h2 className="breeze-page__title">Audit Logging</h2>
+      <p className="breeze-page__lede">View and filter system audit logs</p>
     </div>
+  );
+
+  const hasActiveFilters = Boolean(
+    selectedUserId || selectedModule || selectedAction || fromDate || toDate || appliedSearchQuery
   );
 
   const applySearch = () => {
@@ -371,41 +371,33 @@ function AuditLogging() {
     _pagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
 
-  const selectControlStyles = {
-    control: (base) => ({
-      ...base,
-      minHeight: 42,
-      borderColor: 'var(--border, #e7ebf3)',
-      borderRadius: 8,
-    }),
-  };
-
   const FILTERS_SECTION = () => (
-    <div className="flex flex-wrap items-center gap-2 justify-between">
-      <div className="flex-1 max-w-md">
-        <div className="relative">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#4c669a] text-[20px]">search</span>
+    <div className="breeze-toolbar">
+      <div className="breeze-search">
+        <div className="breeze-field__control">
+          <span className="material-symbols-outlined breeze-field__icon">search</span>
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Search audit logs..."
             value={searchQuery}
             onChange={(e) => _searchQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && applySearch()}
-            className="w-full h-[42px] pl-10 pr-4 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white placeholder:text-[#4c669a] focus:ring-2 focus:ring-primary focus:border-primary"
+            className="breeze-input"
           />
         </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+
+      <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
         <button
           type="button"
           onClick={() => _filterDrawerOpen(true)}
-          className="inline-flex items-center justify-center gap-2 h-[42px] px-4 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+          className="breeze-btn breeze-btn--outline breeze-btn--inline w-full sm:w-auto"
           title="Filters"
         >
           <span className="material-symbols-outlined text-[20px]">filter_list</span>
           Filters
-          {(selectedUserId || selectedModule || selectedAction || fromDate || toDate || appliedSearchQuery) && (
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-bold px-1.5">
+          {hasActiveFilters && (
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[rgba(43,124,245,0.14)] text-[var(--z3c-primary)] text-xs font-bold px-1.5">
               •
             </span>
           )}
@@ -413,10 +405,11 @@ function AuditLogging() {
         <button
           type="button"
           onClick={() => _reloadKey((k) => k + 1)}
-          className="flex items-center justify-center h-[42px] w-[42px] rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          className="breeze-icon-btn self-center sm:self-auto"
           title="Refresh"
+          aria-label="Refresh audit logs"
         >
-          <span className="material-symbols-outlined text-[20px]">refresh</span>
+          <span className="material-symbols-outlined">refresh</span>
         </button>
       </div>
     </div>
@@ -425,53 +418,58 @@ function AuditLogging() {
   const FILTER_DRAWER = () => (
     <>
       <div
-        className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 ${filterDrawerOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-40 bg-[rgba(1,40,94,0.32)] backdrop-blur-sm transition-opacity duration-200 ${filterDrawerOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={() => _filterDrawerOpen(false)}
         aria-hidden="true"
       />
       <div
-        className={`fixed top-0 right-0 z-50 h-full w-full max-w-md bg-white dark:bg-[#161f30] border-l border-[#e7ebf3] dark:border-[#2a3447] shadow-xl flex flex-col transition-transform duration-200 ease-out ${
+        className={`fixed top-0 right-0 z-50 flex h-full w-full max-w-md flex-col border-l border-[var(--z3c-border-card)] bg-[var(--z3c-surface-card)] shadow-[var(--z3c-shadow-card)] backdrop-blur-md transition-transform duration-200 ease-out ${
           filterDrawerOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Audit log filters"
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e7ebf3] dark:border-[#2a3447]">
-          <h3 className="text-lg font-bold text-[#0d121b] dark:text-white">Filters</h3>
+        <div className="flex items-center justify-between border-b border-[var(--z3c-divider)] px-5 py-4 sm:px-6">
+          <h3 className="breeze-modal__title">Filters</h3>
           <button
             type="button"
             onClick={() => _filterDrawerOpen(false)}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-[#0d121b] dark:text-white transition-colors"
+            className="breeze-icon-btn"
             aria-label="Close filters"
           >
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-[#4c669a] dark:text-gray-400">From Date</label>
+        <div className="flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
+          <div className="breeze-form-field">
+            <label className="breeze-field__label" htmlFor="audit-filter-from">From Date</label>
             <input
+              id="audit-filter-from"
               type="date"
               value={fromDate}
               onChange={(e) => {
                 _fromDate(e.target.value);
                 _pagination((prev) => ({ ...prev, pageIndex: 0 }));
               }}
-              className="px-3 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary"
+              className="breeze-form-input"
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-[#4c669a] dark:text-gray-400">To Date</label>
+          <div className="breeze-form-field">
+            <label className="breeze-field__label" htmlFor="audit-filter-to">To Date</label>
             <input
+              id="audit-filter-to"
               type="date"
               value={toDate}
               onChange={(e) => {
                 _toDate(e.target.value);
                 _pagination((prev) => ({ ...prev, pageIndex: 0 }));
               }}
-              className="px-3 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary"
+              className="breeze-form-input"
             />
           </div>
           <div className="w-full">
-            <Suspense fallback={<div className="h-[42px] rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-[#f8f9fc] dark:bg-[#1a253a]" />}>
+            <Suspense fallback={<div className="h-[var(--z3c-control-h)] rounded-[var(--z3c-radius-control)] border border-[var(--z3c-border-field)] bg-[var(--z3c-surface-field)]" />}>
               <UserFilterAsync
                 usersPromise={usersPromise}
                 selectedUserId={selectedUserId}
@@ -480,9 +478,10 @@ function AuditLogging() {
               />
             </Suspense>
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-[#4c669a] dark:text-gray-400 block mb-1">Filter by Module</label>
+          <div className="breeze-form-field">
+            <label className="breeze-field__label" htmlFor="audit-filter-module">Filter by Module</label>
             <Select
+              inputId="audit-filter-module"
               placeholder="All modules"
               isClearable
               value={selectedModule}
@@ -491,13 +490,13 @@ function AuditLogging() {
                 _pagination((prev) => ({ ...prev, pageIndex: 0 }));
               }}
               options={moduleOptions}
-              classNamePrefix="react-select"
-              styles={selectControlStyles}
+              classNamePrefix="breeze-rs"
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-[#4c669a] dark:text-gray-400 block mb-1">Filter by Action</label>
+          <div className="breeze-form-field">
+            <label className="breeze-field__label" htmlFor="audit-filter-action">Filter by Action</label>
             <Select
+              inputId="audit-filter-action"
               placeholder="All actions"
               isClearable
               value={selectedAction}
@@ -506,23 +505,22 @@ function AuditLogging() {
                 _pagination((prev) => ({ ...prev, pageIndex: 0 }));
               }}
               options={actionOptions}
-              classNamePrefix="react-select"
-              styles={selectControlStyles}
+              classNamePrefix="breeze-rs"
             />
           </div>
         </div>
-        <div className="p-6 border-t border-[#e7ebf3] dark:border-[#2a3447] flex flex-col gap-2">
+        <div className="flex flex-col gap-2 border-t border-[var(--z3c-divider)] bg-[rgba(224,237,244,0.45)] p-5 sm:p-6">
           <button
             type="button"
             onClick={() => _filterDrawerOpen(false)}
-            className="w-full py-2.5 rounded-lg bg-primary text-white font-medium text-sm hover:opacity-90 transition-opacity"
+            className="breeze-btn breeze-btn--primary breeze-btn--inline w-full"
           >
             Done
           </button>
           <button
             type="button"
             onClick={clearFilters}
-            className="w-full py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white font-medium text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="breeze-btn breeze-btn--outline w-full"
           >
             Clear all
           </button>
@@ -534,7 +532,7 @@ function AuditLogging() {
   const CONTENT = () => (
     <Fragment>
       {FILTER_DRAWER()}
-      <div className="p-8 space-y-6">
+      <div className="breeze-page flex-1">
         {PAGE_HEADER()}
         {FILTERS_SECTION()}
         <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => window.location.reload()}>
@@ -576,7 +574,7 @@ function AuditLogging() {
   );
 
   return (
-    <div id="audit-logging">
+    <div id="audit-logging" className="flex min-h-0 flex-1 flex-col">
       {CONTENT()}
     </div>
   );
@@ -593,9 +591,10 @@ function UserFilterAsync({ usersPromise, selectedUserId, _selectedUserId, onAppl
   }, [res]);
 
   return (
-    <Fragment>
-      <label className="text-xs font-medium text-[#4c669a] dark:text-gray-400 block mb-1">Filter by User</label>
+    <div className="breeze-form-field">
+      <label className="breeze-field__label" htmlFor="audit-filter-user">Filter by User</label>
       <Select
+        inputId="audit-filter-user"
         placeholder="All users"
         isClearable
         value={selectedUserId}
@@ -604,17 +603,9 @@ function UserFilterAsync({ usersPromise, selectedUserId, _selectedUserId, onAppl
           onApply?.();
         }}
         options={options}
-        classNamePrefix="react-select"
-        styles={{
-          control: (base) => ({
-            ...base,
-            minHeight: 42,
-            borderColor: 'var(--border, #e7ebf3)',
-            borderRadius: 8,
-          }),
-        }}
+        classNamePrefix="breeze-rs"
       />
-    </Fragment>
+    </div>
   );
 }
 
@@ -626,52 +617,65 @@ function DetailsModal({ row, onClose }) {
   const fallbackStr = getMergedDetails(row);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+    <div className="breeze-modal" onClick={onClose}>
       <div
-        className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447] shadow-xl max-w-3xl w-full max-h-[85vh] flex flex-col"
+        className="breeze-modal__dialog breeze-modal__dialog--wide"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="audit-details-title"
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e7ebf3] dark:border-[#2a3447]">
-          <h3 className="text-lg font-bold text-[#0d121b] dark:text-white">Details</h3>
+        <div className="breeze-modal__header flex items-center justify-between gap-3">
+          <h3 id="audit-details-title" className="breeze-modal__title">Details</h3>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-[#0d121b] dark:text-white"
+            className="breeze-icon-btn shrink-0"
+            aria-label="Close details"
           >
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
-        <div className="p-6 overflow-auto flex-1 min-h-0">
+        <div className="breeze-modal__content">
           {activityDescription && (
-            <p className="text-sm text-[#4c669a] dark:text-gray-400 mb-4 pb-3 border-b border-[#e7ebf3] dark:border-[#2a3447]">
+            <p className="mb-4 pb-3 border-b border-[var(--z3c-divider)] text-sm text-[var(--z3c-subtle)]">
               {activityDescription}
             </p>
           )}
           {ipAddress && (
-            <p className="text-sm text-[#4c669a] dark:text-gray-400 mb-4">
-              <span className="font-semibold text-[#0d121b] dark:text-white mr-1">IP Address:</span>
+            <p className="mb-4 text-sm text-[var(--z3c-subtle)]">
+              <span className="mr-1 font-semibold text-[var(--z3c-heading)]">IP Address:</span>
               <span className="font-mono">{ipAddress}</span>
             </p>
           )}
           {hasStructuredDiff ? (
-            <div className="rounded-lg bg-[#f8fafc] dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] p-4">
-              <div className="flex gap-3 mb-3 text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <div className="rounded-[var(--z3c-radius-control)] border border-[var(--z3c-border-field)] bg-[rgba(255,255,255,0.42)] p-4">
+              <div className="mb-3 flex flex-wrap gap-3 text-[10px] uppercase tracking-wide text-[var(--z3c-hint)]">
                 <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-4 h-3 rounded bg-red-100 dark:bg-red-900/50 border border-red-200 dark:border-red-800" />
+                  <span className="inline-block h-3 w-4 rounded border border-red-200 bg-red-100 dark:border-red-800 dark:bg-red-900/50" />
                   Previous / removed
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-4 h-3 rounded bg-emerald-100 dark:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800" />
+                  <span className="inline-block h-3 w-4 rounded border border-emerald-200 bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/50" />
                   New / added
                 </span>
               </div>
               <DiffViewer value={newValue} depth={0} />
             </div>
           ) : (
-            <pre className="text-xs text-[#0d121b] dark:text-gray-300 whitespace-pre-wrap break-words font-mono">
+            <pre className="whitespace-pre-wrap break-words font-mono text-xs text-[var(--z3c-heading)]">
               {fallbackStr || 'No details'}
             </pre>
           )}
+        </div>
+        <div className="breeze-modal__actions">
+          <button
+            type="button"
+            onClick={onClose}
+            className="breeze-btn breeze-btn--outline"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -716,7 +720,7 @@ function AuditTableContent({ auditPromise, usersPromise, pagination, sorting, _s
         header: 'Timestamp',
         enableSorting: true,
         cell: ({ getValue }) => (
-          <span className="text-sm text-[#0d121b] dark:text-white">{formatTimestamp(getValue())}</span>
+          <span className="text-xs sm:text-sm whitespace-nowrap">{formatTimestamp(getValue())}</span>
         ),
       },
       {
@@ -729,7 +733,7 @@ function AuditTableContent({ auditPromise, usersPromise, pagination, sorting, _s
           const email = typeof u === 'object'
             ? (u?.email || u?.username || u?.name || (rawId && usersMap[rawId]) || rawId)
             : (usersMap[rawId] || rawId);
-          return <span className="text-sm font-medium">{email || '-'}</span>;
+          return <span className="font-medium">{email || '-'}</span>;
         },
       },
       {
@@ -737,7 +741,7 @@ function AuditTableContent({ auditPromise, usersPromise, pagination, sorting, _s
         header: 'Module',
         enableSorting: true,
         cell: ({ getValue }) => (
-          <span className="text-sm text-[#0d121b] dark:text-white">{getValue() ?? '-'}</span>
+          <span>{getValue() ?? '-'}</span>
         ),
       },
       {
@@ -745,7 +749,7 @@ function AuditTableContent({ auditPromise, usersPromise, pagination, sorting, _s
         header: 'Action',
         enableSorting: true,
         cell: ({ getValue }) => (
-          <span className="text-sm text-[#0d121b] dark:text-white">{getValue() ?? '-'}</span>
+          <span>{getValue() ?? '-'}</span>
         ),
       },
       {
@@ -758,15 +762,15 @@ function AuditTableContent({ auditPromise, usersPromise, pagination, sorting, _s
           const hasMore = str.length > DETAILS_TRUNCATE_LEN;
 
           return (
-            <div className="max-w-md">
-              <span className="text-sm text-[#4c669a] dark:text-gray-400 break-all">
+            <div className="max-w-md whitespace-normal">
+              <span className="break-all text-[var(--z3c-subtle)]">
                 {truncated || '-'}
               </span>
               {hasMore && (
                 <button
                   type="button"
                   onClick={() => onDetails(row.original)}
-                  className="ml-2 text-primary text-sm font-medium hover:underline"
+                  className="breeze-link ml-2 text-sm"
                 >
                   View
                 </button>
@@ -798,18 +802,14 @@ function AuditTableContent({ auditPromise, usersPromise, pagination, sorting, _s
 
   const TABLE = () => (
     <div className="overflow-x-auto">
-      <table className="w-full text-left min-w-[800px]">
-        <thead className="bg-[#f8f9fc] dark:bg-[#1a253a] text-[#4c669a] dark:text-gray-400 text-xs font-bold uppercase tracking-wider">
+      <table className="min-w-[720px]">
+        <thead>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className={`px-6 py-4 ${
-                    header.column.getCanSort()
-                      ? 'cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800'
-                      : ''
-                  } transition-colors`}
+                  className={header.column.getCanSort() ? 'cursor-pointer select-none' : ''}
                   onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
                 >
                   <div className="flex items-center gap-2">
@@ -825,21 +825,21 @@ function AuditTableContent({ auditPromise, usersPromise, pagination, sorting, _s
             </tr>
           ))}
         </thead>
-        <tbody className="divide-y divide-[#e7ebf3] dark:divide-[#2a3447]">
+        <tbody>
           {data.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-6 py-8 text-center text-sm text-[#4c669a]">
+              <td colSpan={columns.length} className="!text-center text-[var(--z3c-subtle)]">
                 No audit logs found
               </td>
             </tr>
           ) : (
             table.getRowModel().rows.map((row) => (
-              <tr
-                key={row.id}
-                className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-              >
+              <tr key={row.id}>
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-6 py-4 text-sm text-[#0d121b] dark:text-white">
+                  <td
+                    key={cell.id}
+                    className={cell.column.id === 'details' ? '!whitespace-normal' : ''}
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}
@@ -852,33 +852,38 @@ function AuditTableContent({ auditPromise, usersPromise, pagination, sorting, _s
   );
 
   const PAGINATION_SECTION = () => (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 bg-[#f8f9fc] dark:bg-[#1a253a] border-t border-[#e7ebf3] dark:border-[#2a3447]">
-      <div className="flex items-center gap-2 text-sm text-[#4c669a] dark:text-gray-400">
+    <div className="breeze-pager">
+      <div className="breeze-pager__size">
         <span>Showing</span>
         <select
           value={pagination.pageSize}
           onChange={(e) => table.setPageSize(Number(e.target.value))}
-          className="px-2 py-1 rounded border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+          className="breeze-select"
+          aria-label="Rows per page"
         >
           {PAGINATION_PAGE_SIZES.map((size) => (
             <option key={size} value={size}>{size}</option>
           ))}
         </select>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="breeze-pager__nav overflow-x-auto max-w-full">
         <button
+          type="button"
           onClick={() => table.setPageIndex(0)}
           disabled={!paginationInfo.hasPreviousPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="First page"
         >
-          <span className="material-symbols-outlined text-[18px]">first_page</span>
+          <span className="material-symbols-outlined">first_page</span>
         </button>
         <button
+          type="button"
           onClick={() => table.previousPage()}
           disabled={!paginationInfo.hasPreviousPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="Previous page"
         >
-          <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+          <span className="material-symbols-outlined">chevron_left</span>
         </button>
         <div className="flex items-center gap-1">
           {Array.from({ length: Math.min(5, paginationInfo.totalPages) }, (_, i) => {
@@ -894,13 +899,10 @@ function AuditTableContent({ auditPromise, usersPromise, pagination, sorting, _s
             }
             return (
               <button
+                type="button"
                 key={pageNum}
                 onClick={() => table.setPageIndex(pageNum - 1)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  pagination.pageIndex + 1 === pageNum
-                    ? 'bg-primary text-white'
-                    : 'border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
+                className={`breeze-pagebtn ${pagination.pageIndex + 1 === pageNum ? 'is-current' : ''}`}
               >
                 {pageNum}
               </button>
@@ -908,25 +910,29 @@ function AuditTableContent({ auditPromise, usersPromise, pagination, sorting, _s
           })}
         </div>
         <button
+          type="button"
           onClick={() => table.nextPage()}
           disabled={!paginationInfo.hasNextPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="Next page"
         >
-          <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+          <span className="material-symbols-outlined">chevron_right</span>
         </button>
         <button
+          type="button"
           onClick={() => table.setPageIndex(paginationInfo.totalPages - 1)}
           disabled={!paginationInfo.hasNextPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="Last page"
         >
-          <span className="material-symbols-outlined text-[18px]">last_page</span>
+          <span className="material-symbols-outlined">last_page</span>
         </button>
       </div>
     </div>
   );
 
   return (
-    <div className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447] shadow-sm overflow-hidden">
+    <div className="breeze-table-card">
       {TABLE()}
       {PAGINATION_SECTION()}
     </div>

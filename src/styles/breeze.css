@@ -34,6 +34,11 @@
   --z3c-surface-light: #E4EFF5;
   --z3c-surface-blue: #C0DCEC;
   --z3c-surface-card: rgba(248, 251, 254, 0.95);
+  --z3c-surface-sticky: #F8FBFE;
+  --z3c-surface-sticky-hover: #FFFFFF;
+  --z3c-surface-sticky-selected: #EEF5FD;
+  --z3c-surface-sticky-selected-hover: #E5F0FC;
+  --z3c-surface-action-hover: #E3EEFB;
   --z3c-surface-field: rgba(255, 255, 255, 0.55);
   --z3c-surface-glass: rgba(160, 205, 242, 0.2);
 
@@ -595,6 +600,21 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8.5 6.2 11.7 13 4.9'/%3E%3C/svg%3E");
   }
 
+  .breeze-check__box:indeterminate {
+    border-color: var(--z3c-primary);
+    background-color: var(--z3c-primary);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M3 8h10'/%3E%3C/svg%3E");
+  }
+
+  .breeze-check__box:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .breeze-check:has(.breeze-check__box:disabled) {
+    cursor: not-allowed;
+  }
+
   .breeze-link {
     padding: 0;
     border: 0;
@@ -865,7 +885,7 @@
   }
 
   .breeze-sidenav .breeze-logo {
-    height: 36px;
+    height: 42px;
   }
 
   .breeze-sidenav__nav {
@@ -1242,6 +1262,156 @@
     background: rgba(43, 124, 245, 0.06);
   }
 
+  .breeze-table-card th.is-sticky-end,
+  .breeze-table-card td.is-sticky-end {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    overflow: visible;
+    background-color: var(--z3c-surface-sticky);
+    box-shadow: -8px 0 14px -12px rgba(6, 50, 110, 0.16);
+  }
+
+  .breeze-table-card tbody tr:hover td.is-sticky-end {
+    background-color: var(--z3c-surface-sticky-hover);
+  }
+
+  .breeze-table-card tbody tr.is-selected td.is-sticky-end {
+    background-color: var(--z3c-surface-sticky-selected);
+  }
+
+  .breeze-table-card tbody tr.is-selected:hover td.is-sticky-end {
+    background-color: var(--z3c-surface-sticky-selected-hover);
+  }
+
+  .breeze-table-card td .breeze-select {
+    min-width: 160px;
+    height: 36px;
+    font-size: 12.5px;
+  }
+
+  .breeze-table-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+  }
+
+  .breeze-table-action-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .breeze-table-action-wrap[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    z-index: 12;
+    padding: 5px 8px;
+    border-radius: 8px;
+    background: var(--z3c-heading);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 14px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-50%) translateY(2px);
+    transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+    box-shadow: 0 8px 18px -10px rgba(6, 50, 110, 0.45);
+  }
+
+  .breeze-table-action-wrap[data-tooltip]:hover::after,
+  .breeze-table-action-wrap[data-tooltip]:focus-within::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .breeze-table-action-wrap--tooltip-end[data-tooltip]::after {
+    left: auto;
+    right: 0;
+    transform: translateY(2px);
+  }
+
+  .breeze-table-action-wrap--tooltip-end[data-tooltip]:hover::after,
+  .breeze-table-action-wrap--tooltip-end[data-tooltip]:focus-within::after {
+    transform: translateY(0);
+  }
+
+  .breeze-table-action {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--z3c-label);
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+  }
+
+  .breeze-table-action .material-symbols-outlined {
+    font-size: 18px;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+
+  .breeze-table-action:hover:not(:disabled) {
+    background-color: var(--z3c-surface-action-hover);
+    border-color: rgba(43, 124, 245, 0.18);
+    color: var(--z3c-primary);
+  }
+
+  .breeze-table-action:focus-visible {
+    outline: 2px solid rgba(43, 124, 245, 0.35);
+    outline-offset: 1px;
+  }
+
+  .breeze-table-action:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+  }
+
+  .breeze-table-action.is-busy:not(:disabled) {
+    color: var(--z3c-primary);
+  }
+
+  .breeze-table-card th.is-sticky-end {
+    min-width: 12.5rem;
+    padding-inline: 20px 24px;
+  }
+
+  .breeze-table-card td.is-sticky-end {
+    min-width: 12.5rem;
+    padding-inline: 20px 24px;
+  }
+
+  .breeze-modal__dialog--wide {
+    max-width: 42rem;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .breeze-modal__header {
+    flex: none;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--z3c-divider);
+  }
+
+  .breeze-modal__content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 18px 24px;
+  }
+
   .breeze-pager {
     display: flex;
     flex-wrap: wrap;
@@ -1435,6 +1605,20 @@
     box-shadow: 0 0 0 3px var(--z3c-danger-bg);
   }
 
+  .breeze-form-input--locked {
+    background: rgba(224, 237, 244, 0.65);
+    color: var(--z3c-hint);
+    cursor: default;
+  }
+
+  .breeze-form-input--success {
+    border-color: var(--z3c-success);
+  }
+
+  .breeze-form-input--success:focus {
+    box-shadow: 0 0 0 3px var(--z3c-success-bg);
+  }
+
   .breeze-form-input:disabled,
   .breeze-select:disabled {
     opacity: 0.72;
@@ -1516,7 +1700,26 @@
   }
 
   .breeze-invoice-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     width: 100%;
+  }
+
+  .breeze-invoice-actions .breeze-btn {
+    width: 100%;
+    min-width: 0;
+    height: var(--z3c-control-h);
+    margin-top: 0;
+    padding-inline: 12px;
+    font-size: 13.5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .breeze-invoice-actions .breeze-btn .material-symbols-outlined {
+    flex: none;
+    font-size: 18px;
   }
 
   .breeze-invoice-hint {
@@ -2315,6 +2518,16 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
+    .breeze-invoice-actions {
+      flex-direction: row;
+      flex-wrap: nowrap;
+    }
+
+    .breeze-invoice-actions .breeze-btn {
+      flex: 1 1 0;
+      width: auto;
+    }
+
     .breeze-app-footer {
       padding-inline: 24px;
     }
@@ -2343,21 +2556,6 @@
 
     .breeze-form {
       padding: 28px 32px 32px;
-    }
-
-    .breeze-invoice-footer {
-      flex-direction: row;
-      align-items: flex-end;
-      justify-content: space-between;
-    }
-
-    .breeze-invoice-totals {
-      flex: 1;
-    }
-
-    .breeze-invoice-actions {
-      width: 280px;
-      flex: none;
     }
 
     .breeze-line-items table {
@@ -2508,6 +2706,35 @@
     background: rgba(43, 124, 245, 0.08);
   }
 
+  .dark .breeze-table-action:hover:not(:disabled) {
+    background-color: #1A3552;
+    border-color: rgba(43, 124, 245, 0.28);
+    color: #8eb8ff;
+  }
+
+  .dark .breeze-table-action-wrap[data-tooltip]::after {
+    background: rgba(232, 242, 255, 0.96);
+    color: var(--z3c-heading);
+  }
+
+  .dark .breeze-table-card th.is-sticky-end,
+  .dark .breeze-table-card td.is-sticky-end {
+    background-color: #102034;
+    box-shadow: -8px 0 14px -12px rgba(0, 0, 0, 0.35);
+  }
+
+  .dark .breeze-table-card tbody tr:hover td.is-sticky-end {
+    background-color: #152A42;
+  }
+
+  .dark .breeze-table-card tbody tr.is-selected td.is-sticky-end {
+    background-color: #13263D;
+  }
+
+  .dark .breeze-table-card tbody tr.is-selected:hover td.is-sticky-end {
+    background-color: #17304A;
+  }
+
   .dark .breeze-pill--success {
     background: rgba(107, 195, 115, 0.18);
     color: #8fd896;
@@ -2549,6 +2776,7 @@
 
   .dark .breeze-form-section__header,
   .dark .breeze-form-actions,
+  .dark .breeze-modal__header,
   .dark .breeze-modal__actions {
     border-color: rgba(255, 255, 255, 0.08);
   }
@@ -2584,6 +2812,7 @@
   }
 
   .dark .breeze-form-input:disabled,
+  .dark .breeze-form-input--locked,
   .dark .breeze-select:disabled {
     background: rgba(12, 24, 40, 0.7);
     color: #8aa0b8;

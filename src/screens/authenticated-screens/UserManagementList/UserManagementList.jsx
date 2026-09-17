@@ -1,5 +1,5 @@
 // Packages
-import { Fragment, useMemo, useState, Suspense, use } from 'react';
+import { Fragment, useMemo, useState, Suspense, use, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useReactTable, getCoreRowModel, getSortedRowModel, getPaginationRowModel, flexRender } from '@tanstack/react-table';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -31,7 +31,6 @@ function UserManagementList() {
   const [searchQuery, _searchQuery] = useState('');
   const [appliedSearchQuery, _appliedSearchQuery] = useState('');
   const [isFilterOpen, _isFilterOpen] = useState(false);
-  const [rowSelection, _rowSelection] = useState({});
   const [reloadKey, _reloadKey] = useState(0);
 
   // Filters state
@@ -73,8 +72,8 @@ function UserManagementList() {
   // *********** Render Functions ***********
 
   const TableLoadingSkeleton = () => (
-    <div className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447] shadow-sm overflow-hidden">
-      <div className="px-6 py-8 text-center text-sm text-[#4c669a]">
+    <div className="breeze-table-card">
+      <div className="px-6 py-8 text-center text-sm text-[var(--z3c-subtle)]">
         <div className="flex items-center justify-center gap-2">
           <span className="material-symbols-outlined animate-spin">sync</span>
           Loading Users...
@@ -84,23 +83,17 @@ function UserManagementList() {
   );
 
   const PAGE_HEADER = () => (
-    <div className="flex flex-wrap justify-between items-end gap-4">
-      <div className="space-y-1">
-        <h2 className="text-[#0d121b] dark:text-white text-3xl font-black tracking-tight">
-          User Management
-        </h2>
-        <p className="text-[#4c669a] text-base">Manage users, roles and access permissions</p>
-      </div>
+    <div>
+      <h2 className="breeze-page__title">User Management</h2>
+      <p className="breeze-page__lede">Manage users, roles and access permissions</p>
     </div>
   );
 
   const SEARCH_FILTERS_SECTION = () => (
-    <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
-      <div className="flex-1 max-w-md">
-        <div className="relative">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#4c669a] text-[20px]">
-            search
-          </span>
+    <div className="breeze-toolbar">
+      <div className="breeze-search">
+        <div className="breeze-field__control">
+          <span className="material-symbols-outlined breeze-field__icon">search</span>
           <input
             type="text"
             placeholder="Search users..."
@@ -112,7 +105,7 @@ function UserManagementList() {
                 _pagination((prev) => ({ ...prev, pageIndex: 0 }));
               }
             }}
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white placeholder:text-[#4c669a] focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+            className="breeze-input"
           />
         </div>
       </div>
@@ -120,8 +113,9 @@ function UserManagementList() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative">
           <button
+            type="button"
             onClick={() => _isFilterOpen(!isFilterOpen)}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm font-medium text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors w-full sm:w-auto"
+            className="breeze-btn breeze-btn--outline breeze-btn--inline w-full sm:w-auto"
           >
             <span className="material-symbols-outlined text-[20px]">filter_list</span>
             Filters
@@ -131,14 +125,14 @@ function UserManagementList() {
           </button>
 
           {isFilterOpen && (
-            <div className="absolute right-0 mt-2 z-30 w-64 bg-white dark:bg-[#161f30] rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] shadow-lg">
-              <div className="p-4 space-y-4">
+            <div className="breeze-panel">
+              <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400 uppercase tracking-wider">Status</label>
+                  <label className="breeze-panel__label">Status</label>
                   <select
                     value={filters.isActive}
                     onChange={(e) => handleFilterChange('isActive', e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#0f1323] text-sm text-[#0d121b] dark:text-white py-2 px-3"
+                    className="breeze-select"
                   >
                     <option value="">All</option>
                     <option value="true">Active</option>
@@ -146,11 +140,11 @@ function UserManagementList() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400 uppercase tracking-wider">Role</label>
+                  <label className="breeze-panel__label">Role</label>
                   <select
                     value={filters.role}
                     onChange={(e) => handleFilterChange('role', e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#0f1323] text-sm text-[#0d121b] dark:text-white py-2 px-3"
+                    className="breeze-select"
                   >
                     <option value="">All</option>
                     {USER_ROLE_FILTERS.map((role) => (
@@ -160,16 +154,18 @@ function UserManagementList() {
                     ))}
                   </select>
                 </div>
-                <div className="flex gap-2 pt-2 border-t border-[#e7ebf3] dark:border-[#2a3447]">
+                <div className="flex gap-2 pt-2 border-t border-[var(--z3c-divider)]">
                   <button
+                    type="button"
                     onClick={resetFilters}
-                    className="flex-1 px-3 py-2 text-sm font-medium text-[#4c669a] hover:text-[#0d121b] dark:hover:text-white transition-colors"
+                    className="breeze-link flex-1"
                   >
                     Reset
                   </button>
                   <button
+                    type="button"
                     onClick={applyFilters}
-                    className="flex-1 px-3 py-2 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                    className="breeze-btn breeze-btn--primary breeze-btn--inline flex-1"
                   >
                     Apply
                   </button>
@@ -181,8 +177,9 @@ function UserManagementList() {
 
         {userPerms.create && (
           <button
+            type="button"
             onClick={() => navigate('/user-management/new')}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shadow-md shadow-primary/20 w-full sm:w-auto"
+            className="breeze-btn breeze-btn--primary breeze-btn--inline w-full sm:w-auto"
           >
             <span className="material-symbols-outlined text-[20px]">add</span>
             Create User
@@ -194,7 +191,7 @@ function UserManagementList() {
 
   const CONTENT = () => (
     <Fragment>
-      <div className="p-8 space-y-6">
+      <div className="breeze-page flex-1">
         {PAGE_HEADER()}
         {SEARCH_FILTERS_SECTION()}
         <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => window.location.reload()}>
@@ -203,10 +200,8 @@ function UserManagementList() {
               usersPromise={usersPromise}
               pagination={pagination}
               sorting={sorting}
-              rowSelection={rowSelection}
               _sorting={_sorting}
               _pagination={_pagination}
-              _rowSelection={_rowSelection}
               refreshUsers={() => _reloadKey((prev) => prev + 1)}
             />
           </Suspense>
@@ -217,7 +212,7 @@ function UserManagementList() {
   );
 
   return (
-    <div id="user-management-list">
+    <div id="user-management-list" className="flex min-h-0 flex-1 flex-col">
       {CONTENT()}
     </div>
   );
@@ -227,18 +222,10 @@ function UsersTableContent({
   usersPromise,
   pagination,
   sorting,
-  rowSelection,
   _pagination,
   _sorting,
-  _rowSelection,
-  refreshUsers,
 }) {
   const navigate = useNavigate();
-  const authValue = useAtomValue(auth);
-  const loginInfoValue = useAtomValue(loginInfo);
-  const decodedToken = useMemo(() => decodeString(authValue), [authValue]);
-  const user = useMemo(() => parseLoginInfo(loginInfoValue), [loginInfoValue]);
-  const userPerms = useMemo(() => getNormalizedModulePermissions(user, 'user'), [user]);
   const response = use(usersPromise);
   // API returns { data: [...] | { data: [], meta }, meta: { total, page, limit, totalPages } }
   const data = Array.isArray(response?.data) ? response.data : Array.isArray(response?.data?.data) ? response.data.data : [];
@@ -255,28 +242,15 @@ function UsersTableContent({
     hasPreviousPage: page > 1,
   };
 
+  const handleRowClick = useCallback((row, event) => {
+    if (!row.original?._id) return;
+    if (event.target.closest('a')) return;
+
+    navigate(`/user-management/${row.original._id}`);
+  }, [navigate]);
+
   const columns = useMemo(
     () => [
-      {
-        id: 'select',
-        header: ({ table }) => (
-          <input
-            type="checkbox"
-            checked={table.getIsAllRowsSelected()}
-            onChange={table.getToggleAllRowsSelectedHandler()}
-            className="w-4 h-4 rounded border-[#e7ebf3] dark:border-[#2a3447] text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
-          />
-        ),
-        cell: ({ row }) => (
-          <input
-            type="checkbox"
-            checked={row.getIsSelected()}
-            onChange={row.getToggleSelectedHandler()}
-            className="w-4 h-4 rounded border-[#e7ebf3] dark:border-[#2a3447] text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
-          />
-        ),
-        enableSorting: false,
-      },
       {
         accessorKey: 'username',
         header: 'User Name',
@@ -290,22 +264,31 @@ function UsersTableContent({
         header: 'Email',
         enableSorting: true,
         cell: ({ getValue }) => (
-          <a href={`mailto:${getValue()}`} className="text-primary hover:underline">{getValue()}</a>
+          <a
+            href={`mailto:${getValue()}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-primary hover:underline"
+          >
+            {getValue()}
+          </a>
         ),
       },
       {
         accessorKey: 'isActive',
-        header: 'Is Active',
+        header: 'Status',
         enableSorting: true,
         cell: ({ getValue }) => {
           const isActive = getValue();
-          const statusColors = {
-            "false": 'bg-red-100 text-red-700',
-            "true": 'bg-green-100 text-green-700',            
-          };
           return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusColors[isActive?.toString()] || 'bg-gray-100 text-gray-700'}`}>
-              {isActive?.toString()}
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+              isActive
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
+                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                isActive ? 'bg-green-600 dark:bg-green-400' : 'bg-red-600 dark:bg-red-400'
+              }`}></span>
+              {isActive ? 'Active' : 'Inactive'}
             </span>
           );
         },
@@ -326,81 +309,39 @@ function UsersTableContent({
           <span className="text-xs">{getValue()}</span>
         ),
       },
-      {
-        id: 'actions',
-        header: 'Actions',
-        cell: ({ row }) => {
-          if (!userPerms.update) return null;
-
-          const handleChange = (e) => {
-            const value = e.target.value;
-            if (!value) return;
-
-            if (value === 'edit') {
-              navigate(`/user-management/${row.original._id}`);
-            }
-
-            e.target.value = '';
-          };
-
-          return (
-            <select
-              defaultValue=""
-              onChange={handleChange}
-              className="px-3 py-1.5 text-sm rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer"
-            >
-              <option value="" disabled>
-                Action
-              </option>
-              <option value="edit">Edit</option>
-            </select>
-          );
-        },
-        enableSorting: false,
-      },
     ],
-    [navigate, userPerms]
+    []
   );
 
   const table = useReactTable({
     data: data.length > 0 ? data : [],
     columns,
+    getRowId: (row) => row._id,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: _sorting,
-    onRowSelectionChange: _rowSelection,
     onPaginationChange: _pagination,
     manualPagination: true,
     pageCount: paginationInfo.totalPages,
     state: {
       sorting,
-      rowSelection,
       pagination,
     },
-    enableRowSelection: true,
   });
 
   // *********** Render Functions ***********
 
   const USER_TABLE = () => (
     <div className="overflow-x-auto">
-              <table className="w-full text-left min-w-[1000px]">
-        <thead className="bg-[#f8f9fc] dark:bg-[#1a253a] text-[#4c669a] dark:text-gray-400 text-xs font-bold uppercase tracking-wider">
+      <table>
+        <thead>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className={`px-6 py-4 ${
-                    header.column.getCanSort()
-                      ? 'cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800'
-                      : ''
-                  } transition-colors ${header.id === 'select' ? 'w-12' : ''} ${
-                    header.id === 'actions'
-                      ? 'sticky right-0 bg-[#f8f9fc] dark:bg-[#1a253a] z-20 w-32 text-right'
-                      : ''
-                  }`}
+                  className={header.column.getCanSort() ? 'cursor-pointer select-none' : ''}
                   onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
                 >
                   <div className="flex items-center gap-2">
@@ -419,10 +360,10 @@ function UsersTableContent({
             </tr>
           ))}
         </thead>
-        <tbody className="divide-y divide-[#e7ebf3] dark:divide-[#2a3447]">
+        <tbody>
           {data.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-6 py-8 text-center text-sm text-[#4c669a]">
+              <td colSpan={columns.length} className="!text-center text-[var(--z3c-subtle)]">
                 No users found
               </td>
             </tr>
@@ -430,19 +371,11 @@ function UsersTableContent({
             table.getRowModel().rows.map((row) => (
               <tr
                 key={row.id}
-                className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${row.getIsSelected() ? 'bg-primary/5 dark:bg-primary/10' : ''}`}
+                onClick={(event) => handleRowClick(row, event)}
+                className="cursor-pointer"
               >
                 {row.getVisibleCells().map((cell) => (
-                  <td
-                    key={cell.id}
-                    className={`px-6 py-4 text-sm text-[#0d121b] dark:text-white ${
-                      cell.column.id === 'select' ? 'w-12' : ''
-                    } ${
-                      cell.column.id === 'actions'
-                        ? 'sticky right-0 bg-white dark:bg-[#161f30] z-10 w-32 text-right'
-                        : ''
-                    }`}
-                  >
+                  <td key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}
@@ -455,15 +388,16 @@ function UsersTableContent({
   );
 
   const PAGINATION_SECTION = () => (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 bg-[#f8f9fc] dark:bg-[#1a253a] border-t border-[#e7ebf3] dark:border-[#2a3447]">
-      <div className="flex items-center gap-2 text-sm text-[#4c669a] dark:text-gray-400">
+    <div className="breeze-pager">
+      <div className="breeze-pager__size">
         <span>Showing</span>
         <select
           value={pagination.pageSize}
           onChange={(e) => {
             table.setPageSize(Number(e.target.value));
           }}
-          className="px-2 py-1 rounded border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+          className="breeze-select"
+          aria-label="Rows per page"
         >
           {PAGINATION_PAGE_SIZES.map((size) => (
             <option key={size} value={size}>
@@ -473,20 +407,24 @@ function UsersTableContent({
         </select>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="breeze-pager__nav">
         <button
+          type="button"
           onClick={() => table.setPageIndex(0)}
           disabled={!paginationInfo.hasPreviousPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="First page"
         >
-          <span className="material-symbols-outlined text-[18px]">first_page</span>
+          <span className="material-symbols-outlined">first_page</span>
         </button>
         <button
+          type="button"
           onClick={() => table.previousPage()}
           disabled={!paginationInfo.hasPreviousPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="Previous page"
         >
-          <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+          <span className="material-symbols-outlined">chevron_left</span>
         </button>
 
         <div className="flex items-center gap-1">
@@ -504,12 +442,10 @@ function UsersTableContent({
 
             return (
               <button
+                type="button"
                 key={pageNum}
                 onClick={() => table.setPageIndex(pageNum - 1)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${pagination.pageIndex + 1 === pageNum
-                  ? 'bg-primary text-white'
-                  : 'border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
+                className={`breeze-pagebtn ${pagination.pageIndex + 1 === pageNum ? 'is-current' : ''}`}
               >
                 {pageNum}
               </button>
@@ -518,25 +454,29 @@ function UsersTableContent({
         </div>
 
         <button
+          type="button"
           onClick={() => table.nextPage()}
           disabled={!paginationInfo.hasNextPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="Next page"
         >
-          <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+          <span className="material-symbols-outlined">chevron_right</span>
         </button>
         <button
+          type="button"
           onClick={() => table.setPageIndex(paginationInfo.totalPages - 1)}
           disabled={!paginationInfo.hasNextPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="Last page"
         >
-          <span className="material-symbols-outlined text-[18px]">last_page</span>
+          <span className="material-symbols-outlined">last_page</span>
         </button>
       </div>
     </div>
   );
 
   return (
-    <div className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447] shadow-sm overflow-hidden">
+    <div className="breeze-table-card">
       {USER_TABLE()}
       {PAGINATION_SECTION()}
     </div>

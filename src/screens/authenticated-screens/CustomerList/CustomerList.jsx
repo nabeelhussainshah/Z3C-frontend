@@ -119,7 +119,7 @@ function CustomerList() {
             className="breeze-btn breeze-btn--danger-soft"
           >
             <span className="material-symbols-outlined text-[20px]">delete</span>
-            Bulk Delete ({selectedRowCount})
+            Delete ({selectedRowCount})
           </button>
         )}
 

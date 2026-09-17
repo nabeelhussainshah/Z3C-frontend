@@ -47,8 +47,8 @@ function InvoiceList() {
   const [searchQuery, _searchQuery] = useState('');
   const [appliedSearchQuery, _appliedSearchQuery] = useState('');
   const [isFilterOpen, _isFilterOpen] = useState(false);
-  const [isActionsOpen, _isActionsOpen] = useState(false);
   const [rowSelection, _rowSelection] = useState({});
+  const [isBulkDeleteModalOpen, _isBulkDeleteModalOpen] = useState(false);
   const [reloadKey, _reloadKey] = useState(0);
 
   // Filters state
@@ -77,7 +77,7 @@ function InvoiceList() {
     return InvoiceListRequest(decodedToken, params);
   }, [authValue, pagination.pageIndex, pagination.pageSize, appliedSearchQuery, sorting, filters, reloadKey]);
 
-  const selectedRowCount = Object.keys(rowSelection).length;
+  const selectedRowCount = Object.keys(rowSelection).filter((key) => rowSelection[key]).length;
 
   // *********** Handlers ***********
 
@@ -104,8 +104,8 @@ function InvoiceList() {
   // *********** Render Functions ***********
 
   const TableLoadingSkeleton = () => (
-    <div className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447] shadow-sm overflow-hidden">
-      <div className="px-6 py-8 text-center text-sm text-[#4c669a]">
+    <div className="breeze-table-card">
+      <div className="px-6 py-8 text-center text-sm text-[var(--z3c-subtle)]">
         <div className="flex items-center justify-center gap-2">
           <span className="material-symbols-outlined animate-spin">sync</span>
           Loading Invoices...
@@ -115,23 +115,17 @@ function InvoiceList() {
   );
 
   const PAGE_HEADER = () => (
-    <div className="flex flex-wrap justify-between items-end gap-4">
-      <div className="space-y-1">
-        <h2 className="text-[#0d121b] dark:text-white text-3xl font-black tracking-tight">
-          Invoices
-        </h2>
-        <p className="text-[#4c669a] text-base">Manage and track your electronic invoices</p>
-      </div>
+    <div>
+      <h2 className="breeze-page__title">Invoices</h2>
+      <p className="breeze-page__lede">Manage and track your electronic invoices</p>
     </div>
   );
 
   const SEARCH_FILTERS_SECTION = () => (
-    <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
-      <div className="flex-1 max-w-md">
-        <div className="relative">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#4c669a] text-[20px]">
-            search
-          </span>
+    <div className="breeze-toolbar">
+      <div className="breeze-search">
+        <div className="breeze-field__control">
+          <span className="material-symbols-outlined breeze-field__icon">search</span>
           <input
             type="text"
             placeholder="Search invoices..."
@@ -143,55 +137,28 @@ function InvoiceList() {
                 _pagination((prev) => ({ ...prev, pageIndex: 0 }));
               }
             }}
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white placeholder:text-[#4c669a] focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+            className="breeze-input"
           />
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        {selectedRowCount > 0 && (
-          // Temporarily hidden actions dropdown
-          <div className="relative opacity-0">
-            <button
-              onClick={() => _isActionsOpen(!isActionsOpen)}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-primary bg-primary/10 text-sm font-medium text-primary hover:bg-primary/20 transition-colors w-full sm:w-auto"
-            >
-              <span className="material-symbols-outlined text-[20px]">checklist</span>
-              Actions ({selectedRowCount})
-              <span className="material-symbols-outlined text-[16px]">
-                {isActionsOpen ? 'expand_less' : 'expand_more'}
-              </span>
-            </button>
-
-            {isActionsOpen && (
-              <div className="absolute right-0 mt-2 z-30 w-48 bg-white dark:bg-[#161f30] rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] shadow-lg z-20">
-                <div className="py-1">
-                  <button className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <span className="material-symbols-outlined text-[18px]">send</span>
-                    Submit to ZATCA
-                  </button>
-                  <button className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <span className="material-symbols-outlined text-[18px]">mail</span>
-                    Send Email
-                  </button>
-                  <button className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <span className="material-symbols-outlined text-[18px]">download</span>
-                    Export Selected
-                  </button>
-                  <button className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <span className="material-symbols-outlined text-[18px]">print</span>
-                    Print
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+      <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+        {selectedRowCount > 0 && invoicePerms.delete && (
+          <button
+            type="button"
+            onClick={() => _isBulkDeleteModalOpen(true)}
+            className="breeze-btn breeze-btn--danger-soft"
+          >
+            <span className="material-symbols-outlined text-[20px]">delete</span>
+            Delete ({selectedRowCount})
+          </button>
         )}
 
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <button
+            type="button"
             onClick={() => _isFilterOpen(!isFilterOpen)}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm font-medium text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors w-full sm:w-auto"
+            className="breeze-btn breeze-btn--outline breeze-btn--inline w-full sm:w-auto"
           >
             <span className="material-symbols-outlined text-[20px]">filter_list</span>
             Filters
@@ -201,14 +168,15 @@ function InvoiceList() {
           </button>
 
           {isFilterOpen && (
-            <div className="absolute right-0 mt-2 z-30 w-72 bg-white dark:bg-[#161f30] rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] shadow-lg">
-              <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+            <div className="breeze-panel left-0 right-0 sm:left-auto w-auto sm:w-80 max-h-[70vh] overflow-y-auto">
+              <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400 uppercase tracking-wider">Status</label>
+                  <label className="breeze-panel__label" htmlFor="invoice-filter-status">Status</label>
                   <select
+                    id="invoice-filter-status"
                     value={filters.status}
                     onChange={(e) => handleFilterChange('status', e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#0f1323] text-sm text-[#0d121b] dark:text-white py-2 px-3"
+                    className="breeze-select"
                   >
                     <option value="">All</option>
                     {STATUS_FILTER_OPTIONS.map((status) => (
@@ -219,11 +187,12 @@ function InvoiceList() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400 uppercase tracking-wider">Invoice Type</label>
+                  <label className="breeze-panel__label" htmlFor="invoice-filter-type">Invoice Type</label>
                   <select
+                    id="invoice-filter-type"
                     value={filters.invoiceType}
                     onChange={(e) => handleFilterChange('invoiceType', e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#0f1323] text-sm text-[#0d121b] dark:text-white py-2 px-3"
+                    className="breeze-select"
                   >
                     <option value="">All</option>
                     {INVOICE_TYPE_FILTER_OPTIONS.map((type) => (
@@ -234,11 +203,12 @@ function InvoiceList() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400 uppercase tracking-wider">Payment Type</label>
+                  <label className="breeze-panel__label" htmlFor="invoice-filter-payment">Payment Type</label>
                   <select
+                    id="invoice-filter-payment"
                     value={filters.paymentType}
                     onChange={(e) => handleFilterChange('paymentType', e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#0f1323] text-sm text-[#0d121b] dark:text-white py-2 px-3"
+                    className="breeze-select"
                   >
                     <option value="">All</option>
                     {PAYMENT_TYPE_FILTER_OPTIONS.map((type) => (
@@ -249,38 +219,42 @@ function InvoiceList() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400 uppercase tracking-wider">Date Range</label>
-                  <div className="mt-1 space-y-2">
+                  <p className="breeze-panel__label">Date Range</p>
+                  <div className="space-y-2">
                     <div>
-                      <label className="text-[10px] text-[#4c669a] dark:text-gray-500">From</label>
+                      <label className="breeze-field__label" htmlFor="invoice-filter-from">From</label>
                       <input
+                        id="invoice-filter-from"
                         type="date"
                         value={filters.fromDate}
                         onChange={(e) => handleFilterChange('fromDate', e.target.value)}
-                        className="w-full rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#0f1323] text-sm text-[#0d121b] dark:text-white py-2 px-3"
+                        className="breeze-form-input"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-[#4c669a] dark:text-gray-500">To</label>
+                      <label className="breeze-field__label" htmlFor="invoice-filter-to">To</label>
                       <input
+                        id="invoice-filter-to"
                         type="date"
                         value={filters.toDate}
                         onChange={(e) => handleFilterChange('toDate', e.target.value)}
-                        className="w-full rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#0f1323] text-sm text-[#0d121b] dark:text-white py-2 px-3"
+                        className="breeze-form-input"
                       />
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-2 pt-2 border-t border-[#e7ebf3] dark:border-[#2a3447]">
+                <div className="flex gap-2 pt-2 border-t border-[var(--z3c-divider)]">
                   <button
+                    type="button"
                     onClick={resetFilters}
-                    className="flex-1 px-3 py-2 text-sm font-medium text-[#4c669a] hover:text-[#0d121b] dark:hover:text-white transition-colors"
+                    className="breeze-link flex-1"
                   >
                     Reset
                   </button>
                   <button
+                    type="button"
                     onClick={applyFilters}
-                    className="flex-1 px-3 py-2 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                    className="breeze-btn breeze-btn--primary breeze-btn--inline flex-1"
                   >
                     Apply
                   </button>
@@ -292,8 +266,9 @@ function InvoiceList() {
 
         {invoicePerms.create && (
           <button
+            type="button"
             onClick={() => navigate('/invoices/new')}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shadow-md shadow-primary/20 w-full sm:w-auto"
+            className="breeze-btn breeze-btn--primary breeze-btn--inline w-full sm:w-auto"
           >
             <span className="material-symbols-outlined text-[20px]">add</span>
             Create Invoice
@@ -305,7 +280,7 @@ function InvoiceList() {
 
   const CONTENT = () => (
     <Fragment>
-      <div className="p-8 space-y-6">
+      <div className="breeze-page flex-1">
         {PAGE_HEADER()}
         {SEARCH_FILTERS_SECTION()}
         <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => window.location.reload()}>
@@ -318,6 +293,12 @@ function InvoiceList() {
               _sorting={_sorting}
               rowSelection={rowSelection}
               _rowSelection={_rowSelection}
+              isBulkDeleteModalOpen={isBulkDeleteModalOpen}
+              onBulkDeleteModalClose={() => _isBulkDeleteModalOpen(false)}
+              onBulkDeleteComplete={() => {
+                _isBulkDeleteModalOpen(false);
+                _rowSelection({});
+              }}
               refreshInvoices={() => _reloadKey((prev) => prev + 1)}
             />
           </Suspense>
@@ -327,7 +308,11 @@ function InvoiceList() {
     </Fragment>
   );
 
-  return (<div id="invoice-list">{CONTENT()}</div>);
+  return (
+    <div id="invoice-list" className="flex min-h-0 flex-1 flex-col">
+      {CONTENT()}
+    </div>
+  );
 }
 
 function InvoicesTableContent({
@@ -338,6 +323,9 @@ function InvoicesTableContent({
   _sorting,
   rowSelection,
   _rowSelection,
+  isBulkDeleteModalOpen,
+  onBulkDeleteModalClose,
+  onBulkDeleteComplete,
   refreshInvoices,
 }) {
   const navigate = useNavigate();
@@ -365,6 +353,7 @@ function InvoicesTableContent({
   const [isDeleteModalOpen, _isDeleteModalOpen] = useState(false);
   const [selectedInvoiceId, _selectedInvoiceId] = useState(null);
   const [isDeleting, _isDeleting] = useState(false);
+  const [isBulkDeleting, _isBulkDeleting] = useState(false);
   const [actionBusyId, _actionBusyId] = useState(null);
   const [isComplianceResponseModalOpen, _isComplianceResponseModalOpen] = useState(false);
   const [complianceResponseToShow, _complianceResponseToShow] = useState(null);
@@ -442,6 +431,17 @@ function InvoicesTableContent({
   const handleCloseClearanceResponseModal = () => {
     _isClearanceResponseModalOpen(false);
     _clearanceResponseToShow(null);
+  };
+
+  const isInvoiceDeletable = useCallback((invoice) => {
+    if (!invoicePerms.delete || !invoice?._id) return false;
+    const statusConfig = INVOICE_STATUSES.find((status) => status.name === invoice.status);
+    return !!statusConfig?.canDelete;
+  }, [invoicePerms.delete]);
+
+  const handleCloseBulkDeleteModal = () => {
+    if (isBulkDeleting) return;
+    onBulkDeleteModalClose?.();
   };
 
   const handleConfirmDelete = useCallback(() => {
@@ -549,6 +549,17 @@ function InvoicesTableContent({
     [decodedToken, refreshInvoices]
   );
 
+  const handleRowClick = useCallback((row, event) => {
+    if (!row.original?._id) return;
+    if (
+      event.target.closest('input[type="checkbox"]') ||
+      event.target.closest('button') ||
+      event.target.closest('a')
+    ) return;
+
+    navigate(`/invoices/${row.original._id}`);
+  }, [navigate]);
+
   const handlePrintInvoice = async (invoiceId) => {
     if (!invoiceId) return;
     try {
@@ -599,7 +610,8 @@ function InvoicesTableContent({
             type="checkbox"
             checked={table.getIsAllRowsSelected()}
             onChange={table.getToggleAllRowsSelectedHandler()}
-            className="w-4 h-4 rounded border-[#e7ebf3] dark:border-[#2a3447] text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+            className="breeze-check__box"
           />
         ),
         cell: ({ row }) => (
@@ -607,7 +619,8 @@ function InvoicesTableContent({
             type="checkbox"
             checked={row.getIsSelected()}
             onChange={row.getToggleSelectedHandler()}
-            className="w-4 h-4 rounded border-[#e7ebf3] dark:border-[#2a3447] text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+            className="breeze-check__box"
           />
         ),
         enableSorting: false,
@@ -633,7 +646,7 @@ function InvoicesTableContent({
           );
           const colorClass = statusConfig?.color || 'bg-gray-500';
           return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold text-white ${colorClass}`}>
+            <span className={`breeze-pill text-white ${colorClass}`}>
               {status}
             </span>
           );
@@ -662,7 +675,7 @@ function InvoicesTableContent({
         cell: ({ getValue }) => {
           const paid = getValue();
           return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${paid === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+            <span className={`breeze-pill ${paid === 'Yes' ? 'breeze-pill--success' : 'breeze-pill--muted'}`}>
               {paid}
             </span>
           );
@@ -709,92 +722,137 @@ function InvoicesTableContent({
           const statusConfig = INVOICE_STATUSES.find(
             (status) => status.name === row.original.status
           );
-          const canDelete = invoicePerms.delete && !!statusConfig?.canDelete;
           const canReportToZatca = !!statusConfig?.canSubmitToZatca;
-          const canCreateCreditNote = !!statusConfig?.canCreateCreditNote;
-          const canCreateDebitNote = !!statusConfig?.canCreateDebitNote;
           const canCheckCompliance = !!statusConfig?.canCheckCompliance;
           const canPrintProforma = row.original.status === 'DRAFT';
           const hasZatcaXml = [row.original.compliance, row.original.clearance].some(
             (result) => result && Object.keys(result).length > 0
           );
-
+          const hasCompliance = row.original.compliance && Object.keys(row.original.compliance).length > 0;
+          const hasClearance = row.original.clearance && Object.keys(row.original.clearance).length > 0;
+          const isRowBusy = actionBusyId === row.original._id;
           const isBusy = !!actionBusyId;
 
-          const handleChange = (e) => {
-            const value = e.target.value;
-            if (!value) return;
-
-            if (value === 'view') {
-              navigate(`/invoices/${row.original._id}`);
-            } else if (value === 'print') {
-              handlePrintInvoice(row.original._id);
-            } else if (value === 'print-proforma') {
-              handlePrintProformaInvoice(row.original._id);
-            } else if (value === 'compliance-response') {
-              handleOpenComplianceResponseModal(row.original);
-            } else if (value === 'clearance-response') {
-              handleOpenClearanceResponseModal(row.original);
-            } else if (value === 'view-xml') {
-              _xmlInvoice({ id: row.original._id, invoiceNumber: row.original.invoiceNumber });
-            } else if (value === 'credit-note') {
-              handleCreateCreditNote(row.original);
-            } else if (value === 'debit-note') {
-              handleCreateDebitNote(row.original);
-            } else if (value === 'delete') {
-              handleOpenDeleteModal(row.original._id);
-            } else if (value === 'report-zatca') {
-              handleReportToZatca(row.original._id);
-            } else if (value === 'check-compliance') {
-              handleCheckCompliance(row.original._id);
-            }
-
-            // reset back to placeholder
-            e.target.value = '';
-          };
+          const ActionButton = ({ tooltip, label, icon, disabled, onClick, spin }) => (
+            <span className="breeze-table-action-wrap" data-tooltip={tooltip}>
+              <button
+                type="button"
+                className={`breeze-table-action${spin ? ' is-busy' : ''}`}
+                aria-label={label}
+                disabled={disabled}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClick();
+                }}
+              >
+                <span className={`material-symbols-outlined${spin ? ' animate-spin' : ''}`}>{icon}</span>
+              </button>
+            </span>
+          );
 
           return (
-            <select
-              defaultValue=""
-              onChange={handleChange}
-              disabled={isBusy}
-              style={{ width: '227px' }}
-              className="px-3 py-1.5 text-sm rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="" disabled>
-                {isBusy ? '...' : 'Action'}
-              </option>
-              <option value="view">View</option>
-              <option value="print">Print</option>
+            <div className="breeze-table-actions">
+              <ActionButton
+                tooltip="View"
+                label="View invoice"
+                icon="visibility"
+                disabled={isBusy}
+                onClick={() => navigate(`/invoices/${row.original._id}`)}
+              />
+              <ActionButton
+                tooltip="Print"
+                label="Print invoice"
+                icon="print"
+                disabled={isBusy}
+                onClick={() => handlePrintInvoice(row.original._id)}
+              />
               {canPrintProforma && (
-                <option value="print-proforma">Print Proforma</option>
+                <ActionButton
+                  tooltip="Print Proforma"
+                  label="Print proforma invoice"
+                  icon="draft"
+                  disabled={isBusy}
+                  onClick={() => handlePrintProformaInvoice(row.original._id)}
+                />
               )}
-              {(row.original.compliance && Object.keys(row.original.compliance).length > 0) && (
-                <option value="compliance-response">View Compliance Response</option>
+              {hasCompliance && (
+                <ActionButton
+                  tooltip="View Compliance Response"
+                  label="View compliance response"
+                  icon="fact_check"
+                  disabled={isBusy}
+                  onClick={() => handleOpenComplianceResponseModal(row.original)}
+                />
               )}
-              {(row.original.clearance && Object.keys(row.original.clearance).length > 0) && (
-                <option value="clearance-response">View ZATCA Response</option>
+              {hasClearance && (
+                <ActionButton
+                  tooltip="View ZATCA Response"
+                  label="View ZATCA response"
+                  icon="rule"
+                  disabled={isBusy}
+                  onClick={() => handleOpenClearanceResponseModal(row.original)}
+                />
               )}
-              {hasZatcaXml && <option value="view-xml">View ZATCA XML</option>}
-              {canReportToZatca && <option value="report-zatca">Report to ZATCA</option>}
-              {canCheckCompliance && <option value="check-compliance">Check Compliance</option>}
-              {canCreateCreditNote && <option value="credit-note">Create Credit Note </option>}
-              {canCreateDebitNote && <option value="debit-note">Create Debit Note</option>}
-              {canDelete && <option value="delete">Delete</option>}
-            </select>
+              {hasZatcaXml && (
+                <ActionButton
+                  tooltip="View ZATCA XML"
+                  label="View ZATCA XML"
+                  icon="code"
+                  disabled={isBusy}
+                  onClick={() => _xmlInvoice({ id: row.original._id, invoiceNumber: row.original.invoiceNumber })}
+                />
+              )}
+              <ActionButton
+                tooltip={canCheckCompliance ? 'Check Compliance' : 'Compliance unavailable'}
+                label="Check compliance"
+                icon={isRowBusy ? 'sync' : 'verified'}
+                spin={isRowBusy}
+                disabled={isBusy || !canCheckCompliance}
+                onClick={() => handleCheckCompliance(row.original._id)}
+              />
+              <ActionButton
+                tooltip={canReportToZatca ? 'Report to ZATCA' : 'ZATCA submission unavailable'}
+                label="Report to ZATCA"
+                icon={isRowBusy ? 'sync' : 'send'}
+                spin={isRowBusy}
+                disabled={isBusy || !canReportToZatca}
+                onClick={() => handleReportToZatca(row.original._id)}
+              />
+              {canCreateCreditNote && (
+                <ActionButton
+                  tooltip="Create Credit Note"
+                  label="Create credit note"
+                  icon="note_add"
+                  disabled={isBusy}
+                  onClick={() => handleCreateCreditNote(row.original)}
+                />
+              )}
+              {canCreateDebitNote && (
+                <ActionButton
+                  tooltip="Create Debit Note"
+                  label="Create debit note"
+                  icon="post_add"
+                  disabled={isBusy}
+                  onClick={() => handleCreateDebitNote(row.original)}
+                />
+              )}
+              {canDelete && (
+                <ActionButton
+                  tooltip="Delete"
+                  label="Delete invoice"
+                  icon="delete"
+                  disabled={isBusy}
+                  onClick={() => handleOpenDeleteModal(row.original._id)}
+                />
+              )}
+            </div>
           );
         },
         enableSorting: false,
       },
     ],
     [
-      navigate,
-      handleOpenDeleteModal,
-      handleOpenComplianceResponseModal,
-      handleOpenClearanceResponseModal,
-      invoicePerms,
-      handleCreateCreditNote,
-      handleCreateDebitNote,
+      handlePrintInvoice,
       handleReportToZatca,
       handleCheckCompliance,
       actionBusyId,
@@ -873,6 +931,7 @@ function InvoicesTableContent({
   const table = useReactTable({
     data: data.length > 0 ? data : [],
     columns,
+    getRowId: (row) => row._id,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -889,21 +948,52 @@ function InvoicesTableContent({
     enableRowSelection: true,
   });
 
+  const handleConfirmBulkDelete = useCallback(() => {
+    const selectedRows = table.getSelectedRowModel().rows;
+    const deletableInvoices = selectedRows
+      .map((row) => row.original)
+      .filter((invoice) => isInvoiceDeletable(invoice));
+
+    if (deletableInvoices.length === 0) {
+      showToast('No deletable invoices selected', 'error');
+      return;
+    }
+
+    _isBulkDeleting(true);
+    Promise.all(deletableInvoices.map((invoice) => InvoiceDeleteRequest(decodedToken, invoice._id)))
+      .then(() => {
+        showToast(
+          deletableInvoices.length === 1
+            ? 'Invoice deleted successfully!'
+            : `${deletableInvoices.length} invoices deleted successfully!`,
+          'success'
+        );
+        onBulkDeleteComplete?.();
+        refreshInvoices?.();
+      })
+      .catch((err) => {
+        showToast(err?.message || 'Failed to delete selected invoices', 'error');
+      })
+      .finally(() => {
+        _isBulkDeleting(false);
+      });
+  }, [decodedToken, isInvoiceDeletable, onBulkDeleteComplete, refreshInvoices, table]);
+
   // *********** Render Functions ***********
 
   const INVOICES_TABLE = () => (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left min-w-[1400px]">
-        <thead className="bg-[#f8f9fc] dark:bg-[#1a253a] text-[#4c669a] dark:text-gray-400 text-xs font-bold uppercase tracking-wider">
+    <div className="overflow-x-auto min-w-0">
+      <table className="min-w-[72rem]">
+        <thead>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className={`px-6 py-4 ${header.column.getCanSort() ? 'cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800' : ''} transition-colors ${header.id === 'select' ? 'w-12' : ''} ${header.id === 'actions' ? 'sticky right-0 bg-[#f8f9fc] dark:bg-[#1a253a] z-20 w-24 text-right' : ''}`}
+                  className={`${header.column.getCanSort() ? 'cursor-pointer select-none' : ''} ${header.id === 'select' ? 'w-12' : ''} ${header.id === 'actions' ? 'is-sticky-end text-center' : ''}`}
                   onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className={`flex items-center gap-2 ${header.id === 'actions' ? 'justify-center' : ''}`}>
                     {flexRender(header.column.columnDef.header, header.getContext())}
                     {header.column.getCanSort() && (
                       <span className="material-symbols-outlined text-[16px]">
@@ -919,10 +1009,10 @@ function InvoicesTableContent({
             </tr>
           ))}
         </thead>
-        <tbody className="divide-y divide-[#e7ebf3] dark:divide-[#2a3447]">
+        <tbody>
           {data.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-6 py-8 text-center text-sm text-[#4c669a]">
+              <td colSpan={columns.length} className="!text-center text-[var(--z3c-subtle)]">
                 No invoices found
               </td>
             </tr>
@@ -930,15 +1020,13 @@ function InvoicesTableContent({
             table.getRowModel().rows.map((row) => (
               <tr
                 key={row.id}
-                className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${row.getIsSelected() ? 'bg-primary/5 dark:bg-primary/10' : ''}`}
+                onClick={(event) => handleRowClick(row, event)}
+                className={`cursor-pointer ${row.getIsSelected() ? 'is-selected' : ''}`}
               >
                 {row.getVisibleCells().map((cell) => (
                   <td
                     key={cell.id}
-                    className={`px-6 py-4 text-sm text-[#0d121b] dark:text-white ${cell.column.id === 'select' ? 'w-12' : ''} ${cell.column.id === 'actions'
-                      ? 'sticky right-0 bg-white dark:bg-[#161f30] z-20 w-32 text-right'
-                      : ''
-                      }`}
+                    className={`${cell.column.id === 'select' ? 'w-12' : ''} ${cell.column.id === 'actions' ? 'is-sticky-end text-center' : ''}`}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
@@ -952,15 +1040,16 @@ function InvoicesTableContent({
   );
 
   const PAGINATION_SECTION = () => (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 bg-[#f8f9fc] dark:bg-[#1a253a] border-t border-[#e7ebf3] dark:border-[#2a3447]">
-      <div className="flex items-center gap-2 text-sm text-[#4c669a] dark:text-gray-400">
+    <div className="breeze-pager">
+      <div className="breeze-pager__size">
         <span>Showing</span>
         <select
           value={pagination.pageSize}
           onChange={(e) => {
             table.setPageSize(Number(e.target.value));
           }}
-          className="px-2 py-1 rounded border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+          className="breeze-select"
+          aria-label="Rows per page"
         >
           {PAGINATION_PAGE_SIZES.map((size) => (
             <option key={size} value={size}>
@@ -970,20 +1059,24 @@ function InvoicesTableContent({
         </select>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="breeze-pager__nav overflow-x-auto max-w-full">
         <button
+          type="button"
           onClick={() => table.setPageIndex(0)}
           disabled={!paginationInfo.hasPreviousPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="First page"
         >
-          <span className="material-symbols-outlined text-[18px]">first_page</span>
+          <span className="material-symbols-outlined">first_page</span>
         </button>
         <button
+          type="button"
           onClick={() => table.previousPage()}
           disabled={!paginationInfo.hasPreviousPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="Previous page"
         >
-          <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+          <span className="material-symbols-outlined">chevron_left</span>
         </button>
 
         <div className="flex items-center gap-1">
@@ -1001,12 +1094,10 @@ function InvoicesTableContent({
 
             return (
               <button
+                type="button"
                 key={pageNum}
                 onClick={() => table.setPageIndex(pageNum - 1)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${pagination.pageIndex + 1 === pageNum
-                  ? 'bg-primary text-white'
-                  : 'border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
+                className={`breeze-pagebtn ${pagination.pageIndex + 1 === pageNum ? 'is-current' : ''}`}
               >
                 {pageNum}
               </button>
@@ -1015,18 +1106,22 @@ function InvoicesTableContent({
         </div>
 
         <button
+          type="button"
           onClick={() => table.nextPage()}
           disabled={!paginationInfo.hasNextPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="Next page"
         >
-          <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+          <span className="material-symbols-outlined">chevron_right</span>
         </button>
         <button
+          type="button"
           onClick={() => table.setPageIndex(paginationInfo.totalPages - 1)}
           disabled={!paginationInfo.hasNextPage}
-          className="px-3 py-1.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="breeze-pagebtn"
+          aria-label="Last page"
         >
-          <span className="material-symbols-outlined text-[18px]">last_page</span>
+          <span className="material-symbols-outlined">last_page</span>
         </button>
       </div>
     </div>
@@ -1045,6 +1140,19 @@ function InvoicesTableContent({
     />
   );
 
+  const CONFIRM_BULK_DELETE_MODAL = () => (
+    <ConfirmModal
+      isOpen={isBulkDeleteModalOpen}
+      title="Delete selected invoices"
+      description="Are you sure you want to delete the selected invoices? Only invoices that can be deleted will be removed. This action cannot be undone."
+      confirmLabel="Delete"
+      cancelLabel="Cancel"
+      onConfirm={handleConfirmBulkDelete}
+      onCancel={handleCloseBulkDeleteModal}
+      isConfirming={isBulkDeleting}
+    />
+  );
+
   const COMPLIANCE_RESPONSE_MODAL = () => {
     if (!isComplianceResponseModalOpen) return null;
     const structured = parseZatcaResponse(complianceResponseToShow);
@@ -1053,12 +1161,9 @@ function InvoicesTableContent({
     const modalBody = structured ? (
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-[#4c669a] dark:text-gray-400">Status</span>
+          <span className="text-sm font-semibold text-[var(--z3c-subtle)]">Status</span>
           <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${structured.valid
-              ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-              : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
-              }`}
+            className={`breeze-pill ${structured.valid ? 'breeze-pill--success' : 'breeze-pill--danger'}`}
           >
             {structured.valid ? 'Valid' : 'Invalid'}
           </span>
@@ -1093,49 +1198,49 @@ function InvoicesTableContent({
         )}
 
         {structured.sdkOutput ? (
-          <div className="rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-[#f8f9fc] dark:bg-[#0f1323] overflow-hidden">
-            <div className="px-3 py-2 bg-[#e7ebf3] dark:bg-[#1a253a] border-b border-[#e7ebf3] dark:border-[#2a3447] flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#4c669a] dark:text-gray-400 text-[18px]">terminal</span>
-              <span className="text-sm font-bold text-[#0d121b] dark:text-white">SDK Output</span>
+          <div className="rounded-lg border border-[var(--z3c-divider)] bg-[var(--z3c-surface-field)] overflow-hidden">
+            <div className="px-3 py-2 bg-[rgba(224,237,244,0.45)] border-b border-[var(--z3c-divider)] flex items-center gap-2">
+              <span className="material-symbols-outlined text-[var(--z3c-subtle)] text-[18px]">terminal</span>
+              <span className="text-sm font-bold text-[var(--z3c-heading)]">SDK Output</span>
             </div>
-            <pre className="px-3 py-2 text-xs text-[#0d121b] dark:text-gray-200 whitespace-pre-wrap break-words font-mono max-h-48 overflow-auto">
+            <pre className="px-3 py-2 text-xs text-[var(--z3c-heading)] whitespace-pre-wrap break-words font-mono max-h-48 overflow-auto">
               {normalizeLineEndings(structured.sdkOutput)}
             </pre>
           </div>
         ) : null}
       </div>
     ) : (
-      <pre className="text-sm text-[#0d121b] dark:text-gray-200 whitespace-pre-wrap break-words font-mono bg-[#f8f9fc] dark:bg-[#0f1323] rounded-lg p-4 border border-[#e7ebf3] dark:border-[#2a3447]">
+      <pre className="text-sm text-[var(--z3c-heading)] whitespace-pre-wrap break-words font-mono bg-[var(--z3c-surface-field)] rounded-lg p-4 border border-[var(--z3c-divider)]">
         {fallbackContent}
       </pre>
     );
 
     return (
-      <Fragment>
+      <div className="breeze-modal" onClick={handleCloseComplianceResponseModal}>
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-          onClick={handleCloseComplianceResponseModal}
-        />
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-[#161f30] shadow-2xl border border-[#e7ebf3] dark:border-[#2a3447]">
-            <div className="px-6 py-4 border-b border-[#e7ebf3] dark:border-[#2a3447] flex-shrink-0">
-              <h3 className="text-lg font-bold text-[#0d121b] dark:text-white">Compliance Response</h3>
-            </div>
-            <div className="px-6 py-4 overflow-auto flex-1 min-h-0">
-              {modalBody}
-            </div>
-            <div className="px-6 py-4 flex justify-end border-t border-[#e7ebf3] dark:border-[#2a3447] bg-[#f8f9fc] dark:bg-[#1a253a] rounded-b-2xl flex-shrink-0">
-              <button
-                type="button"
-                onClick={handleCloseComplianceResponseModal}
-                className="inline-flex justify-center rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] px-4 py-2.5 text-sm font-medium text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                Close
-              </button>
-            </div>
+          className="breeze-modal__dialog breeze-modal__dialog--wide"
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="compliance-response-title"
+        >
+          <div className="breeze-modal__header">
+            <h3 id="compliance-response-title" className="breeze-modal__title">Compliance Response</h3>
+          </div>
+          <div className="breeze-modal__content">
+            {modalBody}
+          </div>
+          <div className="breeze-modal__actions">
+            <button
+              type="button"
+              onClick={handleCloseComplianceResponseModal}
+              className="breeze-btn breeze-btn--outline"
+            >
+              Close
+            </button>
           </div>
         </div>
-      </Fragment>
+      </div>
     );
   };
 
@@ -1175,31 +1280,30 @@ function InvoicesTableContent({
     );
 
     const statusColorMap = {
-      PASS: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
-      WARNING: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
-      ERROR: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+      PASS: 'breeze-pill breeze-pill--success',
+      WARNING: 'breeze-pill breeze-pill--warning',
+      ERROR: 'breeze-pill breeze-pill--danger',
     };
     const clearanceColorMap = {
-      CLEARED: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
-      NOT_CLEARED: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+      CLEARED: 'breeze-pill breeze-pill--success',
+      NOT_CLEARED: 'breeze-pill breeze-pill--danger',
     };
 
     const modalBody = structured ? (
       <div className="space-y-4">
-        {/* Status badges */}
         <div className="flex flex-wrap items-center gap-3">
           {structured.clearanceStatus && (
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[#4c669a] dark:text-gray-400 uppercase tracking-wide">Clearance</span>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${clearanceColorMap[structured.clearanceStatus] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'}`}>
+              <span className="breeze-panel__label mb-0">Clearance</span>
+              <span className={clearanceColorMap[structured.clearanceStatus] || 'breeze-pill breeze-pill--muted'}>
                 {structured.clearanceStatus}
               </span>
             </div>
           )}
           {structured.status && (
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[#4c669a] dark:text-gray-400 uppercase tracking-wide">Validation</span>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusColorMap[structured.status] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'}`}>
+              <span className="breeze-panel__label mb-0">Validation</span>
+              <span className={statusColorMap[structured.status] || 'breeze-pill breeze-pill--muted'}>
                 {structured.status}
               </span>
             </div>
@@ -1252,49 +1356,50 @@ function InvoicesTableContent({
         )}
 
         {structured.errorMessages.length === 0 && structured.warningMessages.length === 0 && structured.infoMessages.length === 0 && (
-          <p className="text-sm text-[#4c669a] dark:text-gray-400 italic">No messages in this response.</p>
+          <p className="text-sm text-[var(--z3c-subtle)] italic">No messages in this response.</p>
         )}
       </div>
     ) : (
-      <pre className="text-sm text-[#0d121b] dark:text-gray-200 whitespace-pre-wrap break-words font-mono bg-[#f8f9fc] dark:bg-[#0f1323] rounded-lg p-4 border border-[#e7ebf3] dark:border-[#2a3447]">
+      <pre className="text-sm text-[var(--z3c-heading)] whitespace-pre-wrap break-words font-mono bg-[var(--z3c-surface-field)] rounded-lg p-4 border border-[var(--z3c-divider)]">
         {fallbackContent}
       </pre>
     );
 
     return (
-      <Fragment>
+      <div className="breeze-modal" onClick={handleCloseClearanceResponseModal}>
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-          onClick={handleCloseClearanceResponseModal}
-        />
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-[#161f30] shadow-2xl border border-[#e7ebf3] dark:border-[#2a3447]">
-            <div className="px-6 py-4 border-b border-[#e7ebf3] dark:border-[#2a3447] flex-shrink-0">
-              <h3 className="text-lg font-bold text-[#0d121b] dark:text-white">ZATCA Response</h3>
-            </div>
-            <div className="px-6 py-4 overflow-auto flex-1 min-h-0">
-              {modalBody}
-            </div>
-            <div className="px-6 py-4 flex justify-end border-t border-[#e7ebf3] dark:border-[#2a3447] bg-[#f8f9fc] dark:bg-[#1a253a] rounded-b-2xl flex-shrink-0">
-              <button
-                type="button"
-                onClick={handleCloseClearanceResponseModal}
-                className="inline-flex justify-center rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] px-4 py-2.5 text-sm font-medium text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                Close
-              </button>
-            </div>
+          className="breeze-modal__dialog breeze-modal__dialog--wide"
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="zatca-response-title"
+        >
+          <div className="breeze-modal__header">
+            <h3 id="zatca-response-title" className="breeze-modal__title">ZATCA Response</h3>
+          </div>
+          <div className="breeze-modal__content">
+            {modalBody}
+          </div>
+          <div className="breeze-modal__actions">
+            <button
+              type="button"
+              onClick={handleCloseClearanceResponseModal}
+              className="breeze-btn breeze-btn--outline"
+            >
+              Close
+            </button>
           </div>
         </div>
-      </Fragment>
+      </div>
     );
   };
 
   return (
-    <div className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447] shadow-sm overflow-hidden">
+    <div className="breeze-table-card">
       {INVOICES_TABLE()}
       {PAGINATION_SECTION()}
       {CONFIRM_DELETE_MODAL()}
+      {CONFIRM_BULK_DELETE_MODAL()}
       {COMPLIANCE_RESPONSE_MODAL()}
       {ZATCA_RESPONSE_MODAL()}
       {xmlInvoice && (
