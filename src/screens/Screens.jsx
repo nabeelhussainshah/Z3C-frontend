@@ -19,6 +19,8 @@ import {
   CompanyProfileForm,
   InvoiceList,
   InvoiceForm,
+  CurrencyList,
+  CurrencyForm,
   CustomerList,
   CustomerForm,
   CustomerProfileList,
@@ -112,6 +114,19 @@ function Screens() {
                     <Route path="/invoices/new" element={<InvoiceForm />} />
                   )}
                   <Route path="/invoices/:id" element={<InvoiceForm />} />
+                </>
+              )}
+
+              {/* Currency management reuses the companyProfile permissions (as the API does). */}
+              {companyProfilePerms.read && (
+                <>
+                  <Route path="/currencies" element={<CurrencyList />} />
+                  {companyProfilePerms.create && (
+                    <Route path="/currencies/new" element={<CurrencyForm />} />
+                  )}
+                  {companyProfilePerms.update && (
+                    <Route path="/currencies/:code" element={<CurrencyForm />} />
+                  )}
                 </>
               )}
 

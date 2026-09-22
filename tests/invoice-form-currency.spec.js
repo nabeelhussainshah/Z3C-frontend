@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { mockBackend, signIn, ok, callsTo } from './support/mock-backend';
 
 /**
  * Multi-currency invoice form. The backend is mocked with request routing so
@@ -24,55 +25,31 @@ const CUSTOMER = {
   cityName: 'Riyadh',
 };
 
-const ok = (data, status = 200) => ({
-  status,
-  contentType: 'application/json',
-  body: JSON.stringify({ success: true, message: 'ok', status_code: status, data }),
-});
-
-/** Routes every API call (fetch/xhr) to a mock; page assets pass through. */
-async function mockBackend(page, { invoiceList = [] } = {}) {
-  const submitted = [];
-  await page.route('**/*', async (route) => {
-    const req = route.request();
-    if (!['fetch', 'xhr'].includes(req.resourceType())) return route.continue();
-    const path = new URL(req.url()).pathname;
-    const method = req.method();
-
-    if (path.endsWith('/auth/login') && method === 'POST') {
-      return route.fulfill(
-        ok({
-          requireOTP: false,
-          accessToken: 'test-access-token',
-          refreshToken: 'test-refresh-token',
-          user: { id: 'u1', email: 'tester@example.com', username: 'tester', isAdmin: true },
-          navigationMenu: [],
-        }),
-      );
-    }
-    if (path.endsWith('/currencies') && method === 'GET') return route.fulfill(ok(CURRENCIES));
-    if (path.endsWith('/customers') && method === 'GET') return route.fulfill(ok([CUSTOMER]));
-    if (path.endsWith('/invoices/excl-customer') && method === 'POST') {
-      submitted.push(req.postDataJSON());
-      return route.fulfill(ok({ _id: 'inv-new', invoiceNumber: 'INV-2026-000100' }, 201));
-    }
-    if (path.endsWith('/invoices') && method === 'GET') {
-      return route.fulfill(
-        ok({ data: invoiceList, meta: { total: invoiceList.length, page: 1, limit: 10, totalPages: 1 } }),
-      );
-    }
-    return route.fulfill(ok([])); // dashboard widgets and anything else
+/** Mocks the invoice-form endpoints; returns the captured create payloads. */
+async function mockInvoiceBackend(page, { invoiceList = [] } = {}) {
+  const calls = await mockBackend(page, {
+    routes: [
+      { method: 'GET', match: (p) => p.endsWith('/currencies'), respond: () => ok(CURRENCIES) },
+      { method: 'GET', match: (p) => p.endsWith('/customers'), respond: () => ok([CUSTOMER]) },
+      {
+        method: 'POST',
+        match: (p) => p.endsWith('/invoices/excl-customer'),
+        respond: () => ok({ _id: 'inv-new', invoiceNumber: 'INV-2026-000100' }, 201),
+      },
+      {
+        method: 'GET',
+        match: (p) => p.endsWith('/invoices'),
+        respond: () => ok({ data: invoiceList, meta: { total: invoiceList.length, page: 1, limit: 10, totalPages: 1 } }),
+      },
+    ],
   });
-  return submitted;
-}
-
-async function signIn(page) {
-  await page.goto('/login');
-  await page.getByPlaceholder('Enter email').fill('tester@example.com');
-  await page.getByPlaceholder('Enter password').fill('secret');
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  // 2FA disabled: straight into the app — no OTP step.
-  await expect(page.getByPlaceholder('Enter email')).toHaveCount(0);
+  // Live view of submitted create payloads
+  return {
+    get length() {
+      return callsTo(calls, 'POST', '/invoices/excl-customer').length;
+    },
+    at: (i) => callsTo(calls, 'POST', '/invoices/excl-customer')[i].body,
+  };
 }
 
 async function openNewInvoice(page) {
@@ -106,7 +83,7 @@ const rateField = (page) => page.getByLabel(/Exchange Rate \(SAR per 1/);
 
 test.describe('Invoice form — multi-currency', () => {
   test('SAR is the default and shows no exchange-rate field', async ({ page }) => {
-    await mockBackend(page);
+    await mockInvoiceBackend(page);
     await signIn(page);
     await openNewInvoice(page);
 
@@ -116,7 +93,7 @@ test.describe('Invoice form — multi-currency', () => {
   });
 
   test('lists the currencies returned by the API', async ({ page }) => {
-    await mockBackend(page);
+    await mockInvoiceBackend(page);
     await signIn(page);
     await openNewInvoice(page);
 
@@ -125,7 +102,7 @@ test.describe('Invoice form — multi-currency', () => {
   });
 
   test('selecting a foreign currency reveals the rate field and relabels amounts; SAR hides it again', async ({ page }) => {
-    await mockBackend(page);
+    await mockInvoiceBackend(page);
     await signIn(page);
     await openNewInvoice(page);
 
@@ -140,7 +117,7 @@ test.describe('Invoice form — multi-currency', () => {
   });
 
   test('changing currency clears a previously entered rate', async ({ page }) => {
-    await mockBackend(page);
+    await mockInvoiceBackend(page);
     await signIn(page);
     await openNewInvoice(page);
 
@@ -151,7 +128,7 @@ test.describe('Invoice form — multi-currency', () => {
   });
 
   test('a foreign-currency invoice cannot be submitted without a valid rate', async ({ page }) => {
-    const submitted = await mockBackend(page);
+    const submitted = await mockInvoiceBackend(page);
     await signIn(page);
     await openNewInvoice(page);
     await fillValidInvoice(page);
@@ -168,11 +145,11 @@ test.describe('Invoice form — multi-currency', () => {
     await chooseAction(page, 'Create');
     await expect(page.getByText('Exchange rate must be greater than 0')).toBeVisible();
 
-    expect(submitted).toHaveLength(0);
+    expect(submitted.length).toBe(0);
   });
 
   test('submits currency, exchange rate and integer minor-unit amounts (19.99 → 1999)', async ({ page }) => {
-    const submitted = await mockBackend(page);
+    const submitted = await mockInvoiceBackend(page);
     await signIn(page);
     await openNewInvoice(page);
     await fillValidInvoice(page, { price: '19.99' });
@@ -182,7 +159,7 @@ test.describe('Invoice form — multi-currency', () => {
     await chooseAction(page, 'Create');
     await expect.poll(() => submitted.length).toBe(1);
 
-    const body = submitted[0];
+    const body = submitted.at(0);
     expect(body.currency).toBe('USD');
     expect(body.exchangeRate).toBe(3.75);
     expect(body.lineItems[0].price).toBe(1999); // not 1998.9999999999998
@@ -192,7 +169,7 @@ test.describe('Invoice form — multi-currency', () => {
   });
 
   test('a SAR invoice submits currency SAR and no exchange rate', async ({ page }) => {
-    const submitted = await mockBackend(page);
+    const submitted = await mockInvoiceBackend(page);
     await signIn(page);
     await openNewInvoice(page);
     await fillValidInvoice(page, { price: '100' });
@@ -200,10 +177,10 @@ test.describe('Invoice form — multi-currency', () => {
     await chooseAction(page, 'Create');
     await expect.poll(() => submitted.length).toBe(1);
 
-    expect(submitted[0].currency).toBe('SAR');
-    expect(submitted[0]).not.toHaveProperty('exchangeRate');
-    expect(submitted[0].lineItems[0].price).toBe(10000);
-    expect(submitted[0].grandTotal).toBe('115.00');
+    expect(submitted.at(0).currency).toBe('SAR');
+    expect(submitted.at(0)).not.toHaveProperty('exchangeRate');
+    expect(submitted.at(0).lineItems[0].price).toBe(10000);
+    expect(submitted.at(0).grandTotal).toBe('115.00');
   });
 });
 
@@ -217,7 +194,7 @@ test.describe('Invoice list — currency-aware totals', () => {
       customerId: { registrationName: 'Acme Corp' },
       createdAt: '2026-09-01T10:00:00.000Z',
     };
-    await mockBackend(page, {
+    await mockInvoiceBackend(page, {
       invoiceList: [
         { ...base, _id: 'a', currency: 'USD', totalsInCurrency: { grandTotal: 115 }, totalsInSAR: { grandTotal: 431.25 } },
         { ...base, _id: 'b', invoiceNumber: 'INV-2', currency: 'SAR', totalsInCurrency: { grandTotal: 230 }, totalsInSAR: { grandTotal: 230 } },

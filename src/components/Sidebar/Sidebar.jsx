@@ -16,6 +16,7 @@ const navigation = [
   { label: 'Customer', icon: 'people', path: '/customer', permissionKey: 'customer' },
   { label: 'Customer Profiles', icon: 'account_balance', path: '/customer-profile', permissionKey: 'profile' },
   { label: 'Invoices', icon: 'description', path: '/invoices', permissionKey: 'invoice' },
+  { label: 'Currencies', icon: 'currency_exchange', path: '/currencies', permissionKey: 'companyProfile' },
   { label: 'User Management', icon: 'manage_accounts', path: '/user-management', permissionKey: 'user' },
   { label: 'Zatca Reports', icon: 'summarize', path: '/zatca-reports', permissionKey: 'zatcaReporting' },
   { label: 'Audit Logging', icon: 'history', path: '/audit-logging', permissionKey: 'audit' },

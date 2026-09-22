@@ -3,6 +3,8 @@ export { default as CompanyProfileList } from './CompanyProfileList/CompanyProfi
 export { default as CompanyProfileForm } from './CompanyProfileForm/CompanyProfileForm';
 export { default as InvoiceList } from './InvoiceList/InvoiceList';
 export { default as InvoiceForm } from './InvoiceForm/InvoiceForm';
+export { default as CurrencyList } from './CurrencyList/CurrencyList';
+export { default as CurrencyForm } from './CurrencyForm/CurrencyForm';
 export { default as CustomerList } from './CustomerList/CustomerList';
 export { default as CustomerForm } from './CustomerForm/CustomerForm';
 export { default as CustomerProfileList } from './CustomerProfileList/CustomerProfileList';
