@@ -122,7 +122,21 @@ function Login() {
       });
       LoginRequest(payload)
         .then((result) => {
-          const token = result?.data?.tempToken ?? result?.tempToken;
+          const data = result?.data ?? result;
+          // When 2FA is disabled the backend returns a full session directly
+          // (requireOTP === false); log the user straight in, no OTP step.
+          if (data?.requireOTP === false || data?.accessToken) {
+            const accessToken = data?.accessToken;
+            const newRefreshToken = data?.refreshToken;
+            const user = data?.user;
+            setAuth(encodeString(accessToken));
+            setLoginInfo(encodeString(JSON.stringify(user)));
+            if (newRefreshToken) setRefreshToken(encodeString(newRefreshToken));
+            showToast('Login successful', 'success');
+            return;
+          }
+          // 2FA enabled: proceed to the OTP verification step.
+          const token = data?.tempToken;
           _tempToken(token);
           _showOtpCard(true);
           showToast('Please enter OTP.', 'info');
