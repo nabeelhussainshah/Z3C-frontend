@@ -440,8 +440,10 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           description: item.description,
           productCode: item.productCode,
           quantity: 1,
-          price: useCents ? price * 100 || 0 : price,
-          discount_amount: useCents ? discountAmount * 100 || 0 : discountAmount,
+          // Round to integer minor units: e.g. 19.99 * 100 === 1998.9999999999998
+          // in floating point, which the backend (@IsInt) rejects.
+          price: useCents ? Math.round(price * 100) || 0 : price,
+          discount_amount: useCents ? Math.round(discountAmount * 100) || 0 : discountAmount,
           discount_percentage: Number(item.discount_percentage) || 0,
           taxExempt: !!item.taxExempt,
           taxExemptReason: item.taxExemptReason || '',
