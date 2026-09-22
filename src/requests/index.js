@@ -7,6 +7,7 @@ export { default as ForgotPasswordRequest } from './forgot-password.request';
 export { default as ResetPasswordRequest } from './reset-password.request';
 export { default as VerifyOtpRequest } from './verify-otp.request';
 export { default as CustomerListRequest } from './customer-list.request';
+export { default as CurrencyListRequest } from './currency-list.request';
 export { default as CustomerCreateRequest } from './customer-create.request';
 export { default as CustomerDetailRequest } from './customer-detail.request';
 export { default as CustomerUpdateRequest } from './customer-update.request';

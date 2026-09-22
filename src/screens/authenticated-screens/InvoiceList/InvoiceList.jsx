@@ -682,7 +682,10 @@ function InvoicesTableContent({
         cell: ({ row }) => row.original.createdBy?.username || 'N/A'
       },
       {
-        accessorKey: 'totalsInSAR.grandTotal',
+        // Grand total in the invoice's own currency, labelled with that currency.
+        // (totalsInSAR is the SAR equivalent — for a USD invoice it is not a USD amount.)
+        id: 'totalsInCurrency.grandTotal',
+        accessorFn: (row) => row.totalsInCurrency?.grandTotal ?? row.totalsInSAR?.grandTotal,
         header: 'Grand Total',
         enableSorting: true,
         cell: ({ getValue, row }) => {

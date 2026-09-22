@@ -7,7 +7,7 @@ import AsyncSelect from 'react-select/async';
 import { useAtomValue } from 'jotai';
 
 // APIs
-import { InvoiceCreateRequest, InvoiceDetailRequest, InvoiceUpdateRequest, InvoiceCheckComplianceRequest, InvoiceSubmitToZatcaRequest, InvoicePdfDownloadRequest, InvoiceProformaPdfDownloadRequest, CustomerListRequest } from '../../../requests';
+import { InvoiceCreateRequest, InvoiceDetailRequest, InvoiceUpdateRequest, InvoiceCheckComplianceRequest, InvoiceSubmitToZatcaRequest, InvoicePdfDownloadRequest, InvoiceProformaPdfDownloadRequest, CustomerListRequest, CurrencyListRequest } from '../../../requests';
 
 // Utils
 import { Footer, ErrorFallback } from '../../../components';
@@ -47,7 +47,10 @@ const INITIAL_FORM_DATA = {
     countryCode: 'SA',
     // Note
     note: '',
-    vat: 15
+    vat: 15,
+    // Invoice currency. exchangeRate = SAR per 1 unit; only used when currency is not SAR.
+    currency: 'SAR',
+    exchangeRate: '',
   },
   validations: {
     referenceNumber: { isRequired: true, label: 'Reference Number' },
@@ -68,6 +71,16 @@ const INITIAL_LINE_ITEM = {
   discount_percentage: 0,
   taxExempt: false,
   taxExemptReason: '',
+};
+
+/** Validation message for the exchange rate, or null when valid or not applicable (SAR). */
+const getExchangeRateError = ({ currency, exchangeRate }) => {
+  if (!currency || currency === 'SAR') return null;
+  const raw = String(exchangeRate ?? '').trim();
+  if (!raw) return `Exchange rate is required for ${currency}`;
+  if (!/^\d+(\.\d{1,6})?$/.test(raw)) return 'Exchange rate must be a number with up to 6 decimal places';
+  if (!(Number(raw) > 0)) return 'Exchange rate must be greater than 0';
+  return null;
 };
 
 function InvoiceForm() {
@@ -122,6 +135,26 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
   const invoicePerms = useMemo(() => getNormalizedModulePermissions(parseLoginInfo(loginInfoValue), 'invoice'), [loginInfoValue]);
   const [formData, _formData] = useState({ ...INITIAL_FORM_DATA });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Active currencies for the Currency dropdown; SAR is always available.
+  const [currencies, _currencies] = useState([{ code: 'SAR', name: 'Saudi Riyal' }]);
+  useEffect(() => {
+    CurrencyListRequest(decodedToken)
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : [];
+        if (list.length) _currencies(list);
+      })
+      .catch(() => {
+        // Keep the SAR-only fallback; the request helper already surfaced the error.
+      });
+  }, [decodedToken]);
+
+  const currencyCode = formData.data.currency || 'SAR';
+  const isForeignCurrency = currencyCode !== 'SAR';
+  // Keep an existing invoice's currency selectable even if it was deactivated since.
+  const currencyOptions = currencies.some((c) => c.code === currencyCode)
+    ? currencies
+    : [...currencies, { code: currencyCode, name: '' }];
 
   const currentStatusConfig = INVOICE_STATUSES.find((status) => status.name === formData.data.status);
   const canEditInvoice = (!id || currentStatusConfig?.canEdit) && (!id || invoicePerms.update);
@@ -198,6 +231,11 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           countryCode: customer.countryCode || 'SA',
           note: apiData.note || '',
           vat: apiData.vat,
+          currency: (apiData.currency || 'SAR').toUpperCase(),
+          exchangeRate:
+            apiData.currency && apiData.currency.toUpperCase() !== 'SAR' && apiData.exchangeRate != null
+              ? String(apiData.exchangeRate)
+              : '',
           status: apiData.status || '',
         },
       }));
@@ -207,7 +245,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           description: item.description || '',
           productCode: item.productCode || '',
           quantity: 1,
-          // API returns price and discount_amount in cents, so we need to convert it to SAR
+          // API returns price and discount_amount in minor units (cents/halala) of the invoice currency; convert to major units
           price: item.price ? item.price / 100 : 0,
           discount_amount: item.discount_amount ? item.discount_amount / 100 : 0,
           discount_percentage: item.discount_percentage || 0,
@@ -230,6 +268,17 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
         ...old.data,
         [name]: value,
       },
+    }));
+  };
+
+  // Changing currency clears the exchange rate: a rate belongs to one currency,
+  // so a previously entered rate must never carry over to another currency.
+  const handleCurrencyChange = (e) => {
+    const nextCurrency = e.target.value;
+    _formData((old) => ({
+      ...old,
+      data: { ...old.data, currency: nextCurrency, exchangeRate: '' },
+      errors: { ...old.errors, exchangeRate: undefined },
     }));
   };
 
@@ -385,6 +434,12 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
     const validationErrors = { ...errors };
     let isValid = allValid;
 
+    const exchangeRateError = getExchangeRateError(formData.data);
+    if (exchangeRateError) {
+      validationErrors.exchangeRate = exchangeRateError;
+      isValid = false;
+    }
+
     if (!isValid) {
       _formData((old) => ({
         ...old,
@@ -431,7 +486,8 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
       invoiceType: formData.data.invoiceType || 'B2B',
       vat: Number(formData.data.vat),
       note: formData.data.note,
-      currency: 'SAR',
+      currency: currencyCode,
+      ...(isForeignCurrency && { exchangeRate: Number(formData.data.exchangeRate) }),
       grandTotal: totals.grandTotal,
       lineItems: lineItems.map((item) => {
         const price = Number(item.price) || 0;
@@ -1214,14 +1270,44 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400">Currency</label>
-          <input
-            type="text"
-            value="SAR"
-            disabled
-            className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] bg-gray-50 text-sm text-[#0d121b] dark:bg-[#161f30] dark:border-[#2a3447] dark:text-white cursor-not-allowed"
-          />
+          <label htmlFor="invoice-currency" className="text-xs font-bold text-[#4c669a] dark:text-gray-400">Currency</label>
+          <select
+            id="invoice-currency"
+            name="currency"
+            value={currencyCode}
+            onChange={handleCurrencyChange}
+            className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] bg-white pr-8 text-sm text-[#0d121b] focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none dark:bg-[#161f30] dark:border-[#2a3447] dark:text-white"
+          >
+            {currencyOptions.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.name ? `${c.code} — ${c.name}` : c.code}
+              </option>
+            ))}
+          </select>
         </div>
+
+        {isForeignCurrency && (
+          <div className="flex flex-col gap-2">
+            <label htmlFor="invoice-exchange-rate" className="text-xs font-bold text-[#4c669a] dark:text-gray-400">
+              Exchange Rate (SAR per 1 {currencyCode}) *
+            </label>
+            <input
+              id="invoice-exchange-rate"
+              name="exchangeRate"
+              type="number"
+              min="0"
+              step="0.000001"
+              inputMode="decimal"
+              value={formData.data.exchangeRate}
+              onChange={handleChangeFormData}
+              placeholder="e.g. 3.75"
+              className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] bg-white text-sm text-[#0d121b] focus:ring-2 focus:ring-primary focus:border-primary transition-colors dark:bg-[#161f30] dark:border-[#2a3447] dark:text-white"
+            />
+            {formData.errors.exchangeRate && (
+              <span className="text-xs text-tomato">{formData.errors.exchangeRate}</span>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-col gap-2">
           <label className="text-xs font-bold text-[#4c669a] dark:text-gray-400">Note</label>
@@ -1586,7 +1672,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3 w-28">Product Code</th>
                 <th className="px-4 py-3 w-20">Qty</th>
-                <th className="px-4 py-3 w-28">Price (SAR)</th>
+                <th className="px-4 py-3 w-28">Price ({currencyCode})</th>
                 <th className="px-4 py-3 w-28">Disc. Amt</th>
                 <th className="px-4 py-3 w-24">Disc. %</th>
                 <th className="px-4 py-3 w-24">Tax Exempt</th>
@@ -1787,15 +1873,15 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
             <div className="flex gap-8">
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold text-[#4c669a] uppercase">Subtotal</span>
-                <span className="text-lg font-bold dark:text-white">{totals.subtotal} SAR</span>
+                <span className="text-lg font-bold dark:text-white">{totals.subtotal} {currencyCode}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold text-primary uppercase">VAT ({formData.data.vat}%)</span>
-                <span className="text-lg font-bold dark:text-white">{totals.vatAmount} SAR</span>
+                <span className="text-lg font-bold dark:text-white">{totals.vatAmount} {currencyCode}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold text-[#0d121b] dark:text-gray-300 uppercase">Grand Total</span>
-                <span className="text-2xl font-black text-primary">{totals.grandTotal} SAR</span>
+                <span className="text-2xl font-black text-primary">{totals.grandTotal} {currencyCode}</span>
               </div>
             </div>
 
