@@ -48,3 +48,4 @@ export { default as DashboardSubmissionTrendsRequest } from './dashboard-submiss
 export { default as DashboardRecentSubmissionsRequest } from './dashboard-recent-submissions.request';
 export { default as PermissionsFetchRequest } from './permissions-fetch.request';
 export { default as RefreshTokenRequest } from './refresh-token.request';
+export { default as InvoiceZatcaXmlRequest } from './invoice-zatca-xml.request';

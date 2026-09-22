@@ -19,7 +19,7 @@ import {
 
 // Utils 
 import { auth, loginInfo } from '../../../atoms';
-import { Footer, ErrorFallback, ConfirmModal } from '../../../components';
+import { Footer, ErrorFallback, ConfirmModal, ZatcaXmlViewer } from '../../../components';
 import { DEFAULT_PAGE_SIZE, PAGINATION_PAGE_SIZES, decodeString, showToast, parseLoginInfo, getNormalizedModulePermissions, INVOICE_STATUSES } from '../../../utils';
 
 const STATUS_FILTER_OPTIONS = [
@@ -370,6 +370,9 @@ function InvoicesTableContent({
   const [complianceResponseToShow, _complianceResponseToShow] = useState(null);
   const [isClearanceResponseModalOpen, _isClearanceResponseModalOpen] = useState(false);
   const [clearanceResponseToShow, _clearanceResponseToShow] = useState(null);
+  // Invoice whose ZATCA XML is open in the viewer: { id, invoiceNumber }
+  const [xmlInvoice, _xmlInvoice] = useState(null);
+  const handleCloseXmlViewer = useCallback(() => _xmlInvoice(null), []);
 
   // *********** Handlers ***********
 
@@ -711,6 +714,9 @@ function InvoicesTableContent({
           const canCreateDebitNote = !!statusConfig?.canCreateDebitNote;
           const canCheckCompliance = !!statusConfig?.canCheckCompliance;
           const canPrintProforma = row.original.status === 'DRAFT';
+          const hasZatcaXml = [row.original.compliance, row.original.clearance].some(
+            (result) => result && Object.keys(result).length > 0
+          );
 
           const isBusy = !!actionBusyId;
 
@@ -728,6 +734,8 @@ function InvoicesTableContent({
               handleOpenComplianceResponseModal(row.original);
             } else if (value === 'clearance-response') {
               handleOpenClearanceResponseModal(row.original);
+            } else if (value === 'view-xml') {
+              _xmlInvoice({ id: row.original._id, invoiceNumber: row.original.invoiceNumber });
             } else if (value === 'credit-note') {
               handleCreateCreditNote(row.original);
             } else if (value === 'debit-note') {
@@ -766,6 +774,7 @@ function InvoicesTableContent({
               {(row.original.clearance && Object.keys(row.original.clearance).length > 0) && (
                 <option value="clearance-response">View ZATCA Response</option>
               )}
+              {hasZatcaXml && <option value="view-xml">View ZATCA XML</option>}
               {canReportToZatca && <option value="report-zatca">Report to ZATCA</option>}
               {canCheckCompliance && <option value="check-compliance">Check Compliance</option>}
               {canCreateCreditNote && <option value="credit-note">Create Credit Note </option>}
@@ -1287,6 +1296,14 @@ function InvoicesTableContent({
       {CONFIRM_DELETE_MODAL()}
       {COMPLIANCE_RESPONSE_MODAL()}
       {ZATCA_RESPONSE_MODAL()}
+      {xmlInvoice && (
+        <ZatcaXmlViewer
+          key={xmlInvoice.id}
+          invoiceId={xmlInvoice.id}
+          invoiceNumber={xmlInvoice.invoiceNumber}
+          onClose={handleCloseXmlViewer}
+        />
+      )}
     </div>
   );
 }

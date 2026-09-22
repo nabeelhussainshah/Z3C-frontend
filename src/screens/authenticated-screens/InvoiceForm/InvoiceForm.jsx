@@ -1,5 +1,5 @@
 // Packages
-import { Fragment, useState, useMemo, Suspense, use, useEffect } from 'react';
+import { Fragment, useState, useMemo, Suspense, use, useEffect, useCallback } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useNavigate, useParams } from 'react-router-dom';
 import Select from 'react-select';
@@ -10,7 +10,7 @@ import { useAtomValue } from 'jotai';
 import { InvoiceCreateRequest, InvoiceDetailRequest, InvoiceUpdateRequest, InvoiceCheckComplianceRequest, InvoiceSubmitToZatcaRequest, InvoicePdfDownloadRequest, InvoiceProformaPdfDownloadRequest, CustomerListRequest, CurrencyListRequest } from '../../../requests';
 
 // Utils
-import { Footer, ErrorFallback } from '../../../components';
+import { Footer, ErrorFallback, ZatcaXmlViewer } from '../../../components';
 import { showToast, validateSubmissionData, decodeString, INVOICE_STATUSES, parseLoginInfo, getNormalizedModulePermissions } from '../../../utils';
 import { auth, loginInfo } from '../../../atoms';
 
@@ -135,6 +135,11 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
   const invoicePerms = useMemo(() => getNormalizedModulePermissions(parseLoginInfo(loginInfoValue), 'invoice'), [loginInfoValue]);
   const [formData, _formData] = useState({ ...INITIAL_FORM_DATA });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isXmlViewerOpen, _isXmlViewerOpen] = useState(false);
+  const handleCloseXmlViewer = useCallback(() => _isXmlViewerOpen(false), []);
+  // A saved invoice that has been compliance-checked or submitted has ZATCA XML.
+  const hasZatcaXml =
+    !!id && [invoiceData?.data?.compliance, invoiceData?.data?.clearance].some((r) => r && Object.keys(r).length > 0);
 
   // Active currencies for the Currency dropdown; SAR is always available.
   const [currencies, _currencies] = useState([{ code: 'SAR', name: 'Saudi Riyal' }]);
@@ -1821,6 +1826,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
 
   const FOOTER_ACTION_BAR = () => {
     const isDraftOrNew = !id || formData.data.status === 'DRAFT' || formData.data.status === '';
+    const zatcaXmlOptions = hasZatcaXml ? [{ value: 'view-zatca-xml', label: 'View ZATCA XML' }] : [];
 
     const editModeOptions = [
       { value: 'create', label: id ? 'Update' : 'Create' },
@@ -1852,6 +1858,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           },
         ]
         : []),
+      ...zatcaXmlOptions,
       { value: 'cancel', label: 'Cancel' },
     ];
     const viewModeOptions = [
@@ -1862,6 +1869,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
       ...(canCheckComplianceAction
         ? [{ value: 'check-compliance', label: 'Check Compliance' }]
         : []),
+      ...zatcaXmlOptions,
       { value: 'cancel', label: 'Cancel' },
     ];
     const actionOptions = canEditInvoice ? editModeOptions : viewModeOptions;
@@ -1946,6 +1954,10 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
                       handleCheckCompliance();
                       return;
                     }
+                    else if (option.value === 'view-zatca-xml') {
+                      _isXmlViewerOpen(true);
+                      return;
+                    }
                     else {
                       handleSubmitForm();
                     }
@@ -1998,6 +2010,9 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           <span className="material-symbols-outlined text-[16px]">info</span>
           Validation required before submission. Fields must match Phase 2 technical specifications.
         </div>
+        {isXmlViewerOpen && (
+          <ZatcaXmlViewer invoiceId={id} invoiceNumber={formData.data.invoiceNumber} onClose={handleCloseXmlViewer} />
+        )}
       </Fragment>
     );
   };
