@@ -1123,7 +1123,12 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
   };
 
   const handleChangeLineItem = (index, field, value) => {
-    if (exemptionErrors[index]) {
+    if (field === 'taxExemptionCode' || field === 'taxExempt') {
+      // A code change can resolve problems spanning lines (e.g. mixed codes):
+      // clear them all; they are re-checked on submit.
+      _exemptionErrors({});
+      _exemptionMessages([]);
+    } else if (exemptionErrors[index]) {
       _exemptionErrors((old) => {
         const next = { ...old };
         delete next[index];

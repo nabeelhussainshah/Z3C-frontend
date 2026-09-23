@@ -143,7 +143,13 @@ test.describe('VAT exemption codes on invoice lines', () => {
 
     await choose(page, 'Create');
     await expect(page.getByText('Use one zero-rated exemption code per invoice (found VATEX-SA-32, VATEX-SA-33).').first()).toBeVisible();
+    await expect(page.getByText('One zero-rated code per invoice', { exact: true })).toHaveCount(2);
     expect(submitted.count).toBe(0);
+
+    // Resolving the conflict on one line clears it on both lines.
+    await codeSelect(page, 1).selectOption('VATEX-SA-29');
+    await expect(page.getByText('One zero-rated code per invoice', { exact: true })).toHaveCount(0);
+    await expect(page.getByTestId('exemption-messages')).toHaveCount(0);
   });
 
   test('private education needs a customer identified by national ID', async ({ page }) => {
