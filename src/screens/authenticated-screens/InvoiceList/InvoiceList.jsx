@@ -490,6 +490,7 @@ function InvoicesTableContent({
         discount_percentage: item.discount_percentage,
         taxExempt: item.taxExempt,
         taxExemptReason: item.taxExemptReason,
+        ...(item.taxExempt && item.taxExemptionCode && { taxExemptionCode: item.taxExemptionCode }),
       })),
       vat: vat ?? 15,
       paymentType: paymentType || 'CASH',

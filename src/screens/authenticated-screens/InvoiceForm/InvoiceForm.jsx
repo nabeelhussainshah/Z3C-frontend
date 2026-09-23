@@ -7,11 +7,11 @@ import AsyncSelect from 'react-select/async';
 import { useAtomValue } from 'jotai';
 
 // APIs
-import { InvoiceCreateRequest, InvoiceDetailRequest, InvoiceUpdateRequest, InvoiceCheckComplianceRequest, InvoiceSubmitToZatcaRequest, InvoicePdfDownloadRequest, InvoiceProformaPdfDownloadRequest, CustomerListRequest, CurrencyListRequest } from '../../../requests';
+import { InvoiceCreateRequest, InvoiceDetailRequest, InvoiceUpdateRequest, InvoiceCheckComplianceRequest, InvoiceSubmitToZatcaRequest, InvoicePdfDownloadRequest, InvoiceProformaPdfDownloadRequest, CustomerListRequest, CurrencyListRequest, VatExemptionCodesRequest } from '../../../requests';
 
 // Utils
 import { Footer, ErrorFallback, ZatcaXmlViewer } from '../../../components';
-import { showToast, validateSubmissionData, decodeString, INVOICE_STATUSES, parseLoginInfo, getNormalizedModulePermissions } from '../../../utils';
+import { showToast, validateSubmissionData, decodeString, INVOICE_STATUSES, parseLoginInfo, getNormalizedModulePermissions, OUT_OF_SCOPE_CODE, isVatZero, groupExemptionCodes, matchExemptionCodeByText, nextExemptionReason, validateLineExemptions } from '../../../utils';
 import { auth, loginInfo } from '../../../atoms';
 
 const INITIAL_FORM_DATA = {
@@ -71,6 +71,7 @@ const INITIAL_LINE_ITEM = {
   discount_percentage: 0,
   taxExempt: false,
   taxExemptReason: '',
+  taxExemptionCode: '',
 };
 
 /** Validation message for the exchange rate, or null when valid or not applicable (SAR). */
@@ -141,6 +142,19 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
   const hasZatcaXml =
     !!id && [invoiceData?.data?.compliance, invoiceData?.data?.clearance].some((r) => r && Object.keys(r).length > 0);
 
+  // ZATCA VAT exemption codes for the line items' exemption dropdown.
+  const [exemptionCodes, _exemptionCodes] = useState([]);
+  useEffect(() => {
+    VatExemptionCodesRequest(decodedToken)
+      .then((res) => _exemptionCodes(Array.isArray(res?.data) ? res.data : []))
+      .catch(() => {
+        // The request helper already surfaced the error.
+      });
+  }, [decodedToken]);
+  // Validation feedback for the exemption fields: per line, and invoice-wide messages.
+  const [exemptionErrors, _exemptionErrors] = useState({});
+  const [exemptionMessages, _exemptionMessages] = useState([]);
+
   // Active currencies for the Currency dropdown; SAR is always available.
   const [currencies, _currencies] = useState([{ code: 'SAR', name: 'Saudi Riyal' }]);
   useEffect(() => {
@@ -180,6 +194,14 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
   };
 
   const [lineItems, _lineItems] = useState([]);
+
+  // At VAT 0% every line is tax exempt (the checkbox is locked on).
+  const vatIsZero = isVatZero(formData.data.vat);
+  const isLineExempt = (item) => vatIsZero || !!item.taxExempt;
+  // Lines saved before codes existed get the code matching their reason text.
+  const lineExemptionCode = (item) =>
+    item.taxExemptionCode ||
+    (item.taxExemptReason ? matchExemptionCodeByText(exemptionCodes, item.taxExemptReason)?.code ?? '' : '');
 
   const totals = useMemo(() => {
     const totalCents = lineItems.reduce(
@@ -256,6 +278,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           discount_percentage: item.discount_percentage || 0,
           taxExempt: item.taxExempt || false,
           taxExemptReason: item.taxExemptReason || '',
+          taxExemptionCode: item.taxExemptionCode || '',
         })));
       }
     } else if (invoiceData?.isError) {
@@ -377,6 +400,18 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
     let allValid = true;
     const lineItemErrors = {};
 
+    // ZATCA VAT exemption rules (code + reason for exempt lines and at VAT 0%)
+    const exemption = validateLineExemptions({
+      lineItems: lineItems.map((it) => ({
+        ...it,
+        taxExempt: isLineExempt(it),
+        taxExemptionCode: lineExemptionCode(it),
+      })),
+      vat: formData.data.vat,
+      codes: exemptionCodes,
+      identificationScheme: formData.data.identificationScheme,
+    });
+
     // Validate each line item
     lineItems.forEach((item, index) => {
       const { allValid: itemValid, errors: itemErrors } = validateSubmissionData(
@@ -392,16 +427,20 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
         errors.discount_percentage = 'Discount percentage cannot exceed 100%';
       }
 
-      // If taxExempt is true, taxExemptReason is required
-      if (item.taxExempt && (!item.taxExemptReason || item.taxExemptReason.trim() === '')) {
-        errors.taxExemptReason = 'Tax exempt reason is required when tax exempt is selected';
-      }
+      Object.assign(errors, exemption.lineErrors[index]);
 
       if (!itemValid || Object.keys(errors).length > 0) {
         allValid = false;
         lineItemErrors[index] = errors;
       }
     });
+
+    _exemptionErrors(exemption.lineErrors);
+    _exemptionMessages(exemption.messages);
+    if (exemption.messages.length > 0) {
+      allValid = false;
+      lineItemErrors.exemption = exemption.messages.join(' ');
+    }
 
     return { allValid, errors: lineItemErrors };
   };
@@ -417,6 +456,8 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
     Object.values(lineItemErrors).forEach((errors) => {
       if (typeof errors === 'object' && errors !== null) {
         Object.keys(errors).forEach((field) => {
+          // Exemption problems are described by the exemption messages.
+          if (field === 'taxExemptionCode' || field === 'taxExemptReason') return;
           missingFields.add(field);
         });
       }
@@ -427,7 +468,12 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
       return field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1');
     });
 
-    return `Line items have missing ${fieldNames.join(', ')}`;
+    return [
+      lineItemErrors.exemption,
+      fieldNames.length > 0 ? `Line items have missing ${fieldNames.join(', ')}` : null,
+    ]
+      .filter(Boolean)
+      .join(' ');
   };
 
   const handleValidateForm = () => {
@@ -497,6 +543,8 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
       lineItems: lineItems.map((item) => {
         const price = Number(item.price) || 0;
         const discountAmount = Number(item.discount_amount) || 0;
+        const exempt = isLineExempt(item);
+        const code = lineExemptionCode(item);
         return {
           description: item.description,
           productCode: item.productCode,
@@ -506,8 +554,9 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           price: useCents ? Math.round(price * 100) || 0 : price,
           discount_amount: useCents ? Math.round(discountAmount * 100) || 0 : discountAmount,
           discount_percentage: Number(item.discount_percentage) || 0,
-          taxExempt: !!item.taxExempt,
-          taxExemptReason: item.taxExemptReason || '',
+          taxExempt: exempt,
+          taxExemptReason: exempt ? (item.taxExemptReason || '').trim() : '',
+          ...(exempt && code && { taxExemptionCode: code }),
         };
       }),
     };
@@ -1074,9 +1123,29 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
   };
 
   const handleChangeLineItem = (index, field, value) => {
+    if (exemptionErrors[index]) {
+      _exemptionErrors((old) => {
+        const next = { ...old };
+        delete next[index];
+        return next;
+      });
+    }
     _lineItems((old) =>
       old.map((item, i) => {
         if (i !== index) return item;
+
+        // Unticking "Tax exempt" hides and clears the exemption fields.
+        if (field === 'taxExempt' && !value) {
+          return { ...item, taxExempt: false, taxExemptionCode: '', taxExemptReason: '' };
+        }
+        // Choosing a code pre-fills the reason with its official text.
+        if (field === 'taxExemptionCode') {
+          return {
+            ...item,
+            taxExemptionCode: value,
+            taxExemptReason: nextExemptionReason(exemptionCodes, lineExemptionCode(item), value, item.taxExemptReason),
+          };
+        }
 
         // Format/Sanitize numeric values or use raw value for other fields
         const formattedValue = field === 'taxExempt'
@@ -1681,7 +1750,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
                 <th className="px-4 py-3 w-28">Disc. Amt</th>
                 <th className="px-4 py-3 w-24">Disc. %</th>
                 <th className="px-4 py-3 w-24">Tax Exempt</th>
-                <th className="px-4 py-3 w-32">Exempt Reason</th>
+                <th className="px-4 py-3 min-w-[16rem]">Exemption Code / Reason</th>
                 <th className="px-4 py-3 w-28 text-right">Total</th>
                 <th className="px-4 py-3 w-16"></th>
               </tr>
@@ -1769,23 +1838,51 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
-                        checked={item.taxExempt}
+                        checked={isLineExempt(item)}
+                        disabled={vatIsZero}
+                        title={vatIsZero ? 'VAT is 0%: every line is tax exempt' : undefined}
                         onChange={(e) =>
                           handleChangeLineItem(index, 'taxExempt', e.target.checked)
                         }
-                        className="w-4 h-4 rounded border-[#e7ebf3] dark:border-[#2a3447] text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
+                        className="w-4 h-4 rounded border-[#e7ebf3] dark:border-[#2a3447] text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                       />
                     </td>
-                    <td className="px-4 py-3">
-                      <input
-                        className="w-full bg-transparent border-none p-0 text-sm focus:ring-0 dark:text-white"
-                        type="text"
-                        value={item.taxExemptReason}
-                        onChange={(e) =>
-                          handleChangeLineItem(index, 'taxExemptReason', e.target.value)
-                        }
-                        placeholder="e.g. Export"
-                      />
+                    <td className="px-4 py-3 align-top">
+                      {isLineExempt(item) && (
+                        <div className="flex flex-col gap-1.5 min-w-[16rem]">
+                          <select
+                            aria-label={`Exemption code, line ${index + 1}`}
+                            value={lineExemptionCode(item)}
+                            onChange={(e) => handleChangeLineItem(index, 'taxExemptionCode', e.target.value)}
+                            className={`w-full rounded border px-2 py-1 text-xs bg-white dark:bg-[#161f30] dark:text-white ${exemptionErrors[index]?.taxExemptionCode ? 'border-tomato' : 'border-[#e7ebf3] dark:border-[#2a3447]'}`}
+                          >
+                            <option value="">Select exemption code…</option>
+                            {groupExemptionCodes(exemptionCodes).map((group) => (
+                              <optgroup key={group.category} label={group.label}>
+                                {group.codes.map((c) => (
+                                  <option key={c.code} value={c.code}>
+                                    {c.code} — {c.description}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
+                          {exemptionErrors[index]?.taxExemptionCode && (
+                            <span className="text-[11px] text-tomato">{exemptionErrors[index].taxExemptionCode}</span>
+                          )}
+                          <input
+                            aria-label={`Exemption reason, line ${index + 1}`}
+                            type="text"
+                            value={item.taxExemptReason}
+                            onChange={(e) => handleChangeLineItem(index, 'taxExemptReason', e.target.value)}
+                            placeholder={lineExemptionCode(item) === OUT_OF_SCOPE_CODE ? 'Why is this out of scope?' : 'Exemption reason'}
+                            className={`w-full rounded border px-2 py-1 text-xs bg-transparent dark:text-white ${exemptionErrors[index]?.taxExemptReason ? 'border-tomato' : 'border-[#e7ebf3] dark:border-[#2a3447]'}`}
+                          />
+                          {exemptionErrors[index]?.taxExemptReason && (
+                            <span className="text-[11px] text-tomato">{exemptionErrors[index].taxExemptReason}</span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right font-bold">
                       {calculateTotal(item)}
@@ -1807,6 +1904,13 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
         </div>
         {formData.errors.lineItems && (
           <span className="text-xs text-tomato mt-2 block">{formData.errors.lineItems}</span>
+        )}
+        {exemptionMessages.length > 0 && (
+          <ul className="mt-2 space-y-1" data-testid="exemption-messages">
+            {exemptionMessages.map((message) => (
+              <li key={message} className="text-xs text-tomato">{message}</li>
+            ))}
+          </ul>
         )}
       </section>
     );
