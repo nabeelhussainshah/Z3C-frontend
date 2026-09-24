@@ -26,12 +26,12 @@ const LINES = [
   { id: 4, name: 'Training abroad', net: '1249.99', vat: '0.00', withVat: '1249.99', cat: 'O', pct: '0.00' },
 ];
 
-function invoiceXml({ payable = '12356.79', qrTotal = '12356.79', qrVat = '1448.71' } = {}) {
+function invoiceXml({ payable = '12356.79', qrTotal = '12356.79', qrVat = '1448.71', lines = LINES } = {}) {
   const qr = qrTlv({ 1: 'AVIANTA SERVICES LLC', 2: '399999999900003', 3: '2026-09-22T21:13:33Z', 4: qrTotal, 5: qrVat, 6: 'x'.repeat(44) });
   const line = (l) => `
     <cac:InvoiceLine>
         <cbc:ID>${l.id}</cbc:ID>
-        <cbc:InvoicedQuantity unitCode="PCE">1</cbc:InvoicedQuantity>
+        <cbc:InvoicedQuantity unitCode="PCE">${l.qty ?? 1}</cbc:InvoicedQuantity>
         <cbc:LineExtensionAmount currencyID="SAR">${l.net}</cbc:LineExtensionAmount>
         <cac:TaxTotal>
             <cbc:TaxAmount currencyID="SAR">${l.vat}</cbc:TaxAmount>
@@ -42,8 +42,8 @@ function invoiceXml({ payable = '12356.79', qrTotal = '12356.79', qrVat = '1448.
             <cac:ClassifiedTaxCategory><cbc:ID>${l.cat}</cbc:ID><cbc:Percent>${l.pct}</cbc:Percent></cac:ClassifiedTaxCategory>
         </cac:Item>
         <cac:Price>
-            <cbc:PriceAmount currencyID="SAR">${l.net}</cbc:PriceAmount>
-            ${l.discount ? `<cac:AllowanceCharge><cbc:ChargeIndicator>false</cbc:ChargeIndicator><cbc:Amount currencyID="SAR">${l.discount}</cbc:Amount><cbc:BaseAmount currencyID="SAR">${l.gross}</cbc:BaseAmount></cac:AllowanceCharge>` : ''}
+            <cbc:PriceAmount currencyID="SAR">${l.unitNet ?? l.net}</cbc:PriceAmount>
+            ${l.discount ? `<cac:AllowanceCharge><cbc:ChargeIndicator>false</cbc:ChargeIndicator><cbc:Amount currencyID="SAR">${l.unitDiscount ?? l.discount}</cbc:Amount><cbc:BaseAmount currencyID="SAR">${l.unitGross ?? l.gross}</cbc:BaseAmount></cac:AllowanceCharge>` : ''}
         </cac:Price>
     </cac:InvoiceLine>`;
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -82,7 +82,7 @@ function invoiceXml({ payable = '12356.79', qrTotal = '12356.79', qrVat = '1448.
         <cbc:AllowanceTotalAmount currencyID="SAR">0</cbc:AllowanceTotalAmount>
         <cbc:PrepaidAmount currencyID="SAR">0</cbc:PrepaidAmount>
         <cbc:PayableAmount currencyID="SAR">${payable}</cbc:PayableAmount>
-    </cac:LegalMonetaryTotal>${LINES.map(line).join('')}
+    </cac:LegalMonetaryTotal>${lines.map(line).join('')}
 </Invoice>`;
 }
 
@@ -231,7 +231,7 @@ test.describe('ZATCA XML viewer', () => {
   test('checks pass for consistent XML, and flag the exempt line category mismatch as a warning', async ({ page }) => {
     await openViewerFromList(page);
 
-    for (const id of ['currency', 'lines-sum', 'line-vat', 'tax-exclusive', 'breakdown-taxable', 'breakdown-tax', 'tax-totals', 'tax-inclusive', 'payable', 'stored-totals', 'qr']) {
+    for (const id of ['currency', 'lines-sum', 'line-vat', 'line-quantity', 'line-price', 'tax-exclusive', 'breakdown-taxable', 'breakdown-tax', 'tax-totals', 'tax-inclusive', 'payable', 'stored-totals', 'qr']) {
       await expect(check(page, id), id).toHaveAttribute('data-status', 'pass');
     }
     await expect(check(page, 'stored-totals')).toContainText('10,908.08 + 1,448.71 VAT = 12,356.79 SAR');
@@ -349,5 +349,27 @@ test.describe('ZATCA XML viewer', () => {
     await page.getByText('View ZATCA XML', { exact: true }).click();
     await expect(dialog(page)).toContainText('ZATCA XML — INV-2026-000018');
     expect(callsTo(calls, 'GET', '/invoices/inv-18/xml').length).toBeGreaterThan(0);
+  });
+
+  test('a line with quantity 3: per-unit prices shown, quantity × net unit price checked', async ({ page }) => {
+    // Implementation: 3 × (1,250.00 − 156.25) = 3 × 1,093.75 = 3,281.25 (same line amount as the fixture)
+    const qtyLines = LINES.map((l) => (l.id === 3 ? { ...l, qty: 3, unitGross: '1250.00', unitDiscount: '156.25', unitNet: '1093.75' } : l));
+    await openViewerFromList(page, { view: xmlView({ documents: [{ ...CLEARED_DOC, xml: invoiceXml({ lines: qtyLines }) }] }) });
+
+    const rows = dialog(page).getByTestId('xml-lines').locator('tbody tr');
+    await expect(rows.nth(2)).toHaveText(/Implementation.*3.*1,250\.00.*156\.25.*3,281\.25/);
+    await expect(check(page, 'line-quantity')).toHaveAttribute('data-status', 'pass');
+    await expect(check(page, 'line-price')).toHaveAttribute('data-status', 'pass');
+    await expect(dialog(page).getByRole('columnheader', { name: 'Discount/unit' })).toBeVisible();
+  });
+
+  test('flags a line whose amount is not quantity × net unit price', async ({ page }) => {
+    const wrong = LINES.map((l) => (l.id === 3 ? { ...l, qty: 3, unitGross: '1250.00', unitDiscount: '156.25', unitNet: '1000.00' } : l));
+    await openViewerFromList(page, { view: xmlView({ documents: [{ ...CLEARED_DOC, xml: invoiceXml({ lines: wrong }) }] }) });
+
+    await expect(check(page, 'line-quantity')).toHaveAttribute('data-status', 'fail');
+    await expect(check(page, 'line-quantity')).toContainText('line 3: 3 × 1,000.00 = 3,000.00 ≠ 3,281.25');
+    await expect(check(page, 'line-price')).toHaveAttribute('data-status', 'fail');
+    await expect(check(page, 'line-price')).toContainText('line 3: 1,250.00 − 156.25 ≠ 1,000.00');
   });
 });

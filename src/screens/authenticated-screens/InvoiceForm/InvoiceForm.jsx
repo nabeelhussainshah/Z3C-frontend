@@ -74,6 +74,15 @@ const INITIAL_LINE_ITEM = {
   taxExemptionCode: '',
 };
 
+// Line quantity: a whole number from 1 to 1,000,000 (same limits as the backend).
+const MAX_LINE_QUANTITY = 1_000_000;
+const isValidQuantity = (value) => {
+  const n = Number(value);
+  return String(value).trim() !== '' && Number.isInteger(n) && n >= 1 && n <= MAX_LINE_QUANTITY;
+};
+// Keys an integer quantity field must not accept.
+const NON_INTEGER_KEYS = ['.', ',', 'e', 'E', '-', '+'];
+
 /** Validation message for the exchange rate, or null when valid or not applicable (SAR). */
 const getExchangeRateError = ({ currency, exchangeRate }) => {
   if (!currency || currency === 'SAR') return null;
@@ -154,6 +163,9 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
   // Validation feedback for the exemption fields: per line, and invoice-wide messages.
   const [exemptionErrors, _exemptionErrors] = useState({});
   const [exemptionMessages, _exemptionMessages] = useState([]);
+  // Lines whose quantity is invalid (highlighted), and the message shown under the table.
+  const [quantityErrorLines, _quantityErrorLines] = useState([]);
+  const [quantityMessage, _quantityMessage] = useState('');
 
   // Active currencies for the Currency dropdown; SAR is always available.
   const [currencies, _currencies] = useState([{ code: 'SAR', name: 'Saudi Riyal' }]);
@@ -271,7 +283,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
         _lineItems(apiData.lineItems.map(item => ({
           description: item.description || '',
           productCode: item.productCode || '',
-          quantity: 1,
+          quantity: item.quantity || 1,
           // API returns price and discount_amount in minor units (cents/halala) of the invoice currency; convert to major units
           price: item.price ? item.price / 100 : 0,
           discount_amount: item.discount_amount ? item.discount_amount / 100 : 0,
@@ -393,9 +405,17 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
     const validationData = {
       description: { isRequired: true },
       productCode: { isRequired: true },
-      quantity: { isRequired: true, isNumber: true },
       price: { isRequired: true, isNumber: true },
     };
+
+    // Quantity: a whole number from 1 to 1,000,000
+    const badQuantity = lineItems.flatMap((it, i) => (isValidQuantity(it.quantity) ? [] : [i]));
+    const quantityRuleMessage =
+      badQuantity.length > 0
+        ? `Quantity must be a whole number from 1 to 1,000,000 (line${badQuantity.length > 1 ? 's' : ''} ${badQuantity.map((i) => i + 1).join(', ')}).`
+        : '';
+    _quantityErrorLines(badQuantity);
+    _quantityMessage(quantityRuleMessage);
 
     let allValid = true;
     const lineItemErrors = {};
@@ -428,6 +448,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
       }
 
       Object.assign(errors, exemption.lineErrors[index]);
+      if (badQuantity.includes(index)) errors.quantity = 'Invalid quantity';
 
       if (!itemValid || Object.keys(errors).length > 0) {
         allValid = false;
@@ -437,6 +458,10 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
 
     _exemptionErrors(exemption.lineErrors);
     _exemptionMessages(exemption.messages);
+    if (quantityRuleMessage) {
+      allValid = false;
+      lineItemErrors.quantityRule = quantityRuleMessage;
+    }
     if (exemption.messages.length > 0) {
       allValid = false;
       lineItemErrors.exemption = exemption.messages.join(' ');
@@ -456,8 +481,8 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
     Object.values(lineItemErrors).forEach((errors) => {
       if (typeof errors === 'object' && errors !== null) {
         Object.keys(errors).forEach((field) => {
-          // Exemption problems are described by the exemption messages.
-          if (field === 'taxExemptionCode' || field === 'taxExemptReason') return;
+          // Exemption and quantity problems are described by their own messages.
+          if (field === 'taxExemptionCode' || field === 'taxExemptReason' || field === 'quantity') return;
           missingFields.add(field);
         });
       }
@@ -469,6 +494,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
     });
 
     return [
+      lineItemErrors.quantityRule,
       lineItemErrors.exemption,
       fieldNames.length > 0 ? `Line items have missing ${fieldNames.join(', ')}` : null,
     ]
@@ -548,7 +574,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
         return {
           description: item.description,
           productCode: item.productCode,
-          quantity: 1,
+          quantity: Number(item.quantity),
           // Round to integer minor units: e.g. 19.99 * 100 === 1998.9999999999998
           // in floating point, which the backend (@IsInt) rejects.
           price: useCents ? Math.round(price * 100) || 0 : price,
@@ -1088,8 +1114,9 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
     if (value === '') return '';
 
     if (field === 'quantity') {
-      // Allow only digits (integer)
-      return value.replace(/[^\d]/g, '');
+      // Whole numbers only: reject (rather than strip) anything else, so a
+      // pasted "2.5" is not turned into 25.
+      return /^\d*$/.test(value) ? value : null;
     }
 
     if (['price', 'discount_amount', 'discount_percentage'].includes(field)) {
@@ -1123,6 +1150,9 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
   };
 
   const handleChangeLineItem = (index, field, value) => {
+    if (field === 'quantity' && quantityErrorLines.includes(index)) {
+      _quantityErrorLines((old) => old.filter((i) => i !== index));
+    }
     if (field === 'taxExemptionCode' || field === 'taxExempt') {
       // A code change can resolve problems spanning lines (e.g. mixed codes):
       // clear them all; they are re-checked on submit.
@@ -1152,6 +1182,9 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           };
         }
 
+        // A rejected quantity keystroke/paste leaves the line unchanged.
+        if (field === 'quantity' && handleFormatLineItemNumericValues(field, value) === null) return item;
+
         // Format/Sanitize numeric values or use raw value for other fields
         const formattedValue = field === 'taxExempt'
           ? value
@@ -1159,10 +1192,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
             ? handleFormatLineItemNumericValues(field, value)
             : value;
 
-        // Get current item values for calculations (as numbers)
-        const quantity = field === 'quantity'
-          ? (formattedValue === '' ? 0 : Number(formattedValue) || 0)
-          : (Number(item.quantity) || 0);
+        // Discounts are per unit, so they depend on the unit price, not the quantity.
         const price = field === 'price'
           ? (formattedValue === '' ? 0 : Number(formattedValue) || 0)
           : (Number(item.price) || 0);
@@ -1752,7 +1782,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
                 <th className="px-4 py-3 w-28">Product Code</th>
                 <th className="px-4 py-3 w-20">Qty</th>
                 <th className="px-4 py-3 w-28">Price ({currencyCode})</th>
-                <th className="px-4 py-3 w-28">Disc. Amt</th>
+                <th className="px-4 py-3 w-28" title="Discount per unit">Disc./Unit</th>
                 <th className="px-4 py-3 w-24">Disc. %</th>
                 <th className="px-4 py-3 w-24">Tax Exempt</th>
                 <th className="px-4 py-3 min-w-[16rem]">Exemption Code / Reason</th>
@@ -1794,13 +1824,18 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
                     </td>
                     <td className="px-4 py-3">
                       <input
-                        className="w-full bg-transparent border-none p-0 text-sm focus:ring-0 dark:text-white cursor-not-allowed opacity-70"
+                        aria-label={`Quantity, line ${index + 1}`}
+                        className={`w-full bg-transparent p-0 text-sm focus:ring-0 dark:text-white ${quantityErrorLines.includes(index) ? 'border border-tomato rounded px-1' : 'border-none'}`}
                         type="number"
-                        min="0"
+                        min="1"
+                        max={MAX_LINE_QUANTITY}
                         step="1"
+                        inputMode="numeric"
                         value={item.quantity}
-                        onChange={() => { }}
-                        disabled
+                        onKeyDown={(e) => {
+                          if (NON_INTEGER_KEYS.includes(e.key)) e.preventDefault();
+                        }}
+                        onChange={(e) => handleChangeLineItem(index, 'quantity', e.target.value)}
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -1909,6 +1944,9 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
         </div>
         {formData.errors.lineItems && (
           <span className="text-xs text-tomato mt-2 block">{formData.errors.lineItems}</span>
+        )}
+        {quantityMessage && (
+          <span className="text-xs text-tomato mt-2 block" data-testid="quantity-message">{quantityMessage}</span>
         )}
         {exemptionMessages.length > 0 && (
           <ul className="mt-2 space-y-1" data-testid="exemption-messages">

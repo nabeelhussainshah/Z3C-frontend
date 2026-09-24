@@ -70,7 +70,7 @@ async function fillValidInvoice(page, { price = '100' } = {}) {
   const row = page.getByPlaceholder('Description of product...').locator('xpath=ancestor::tr');
   await page.getByPlaceholder('Description of product...').fill('Consulting services');
   await page.getByPlaceholder('Product Code').fill('C-1');
-  // number inputs in a row: [0] qty (disabled), [1] price, [2] discount amount, [3] discount %
+  // number inputs in a row: [0] qty, [1] price, [2] discount per unit, [3] discount %
   await row.locator('input[type="number"]').nth(1).fill(price);
 }
 

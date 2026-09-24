@@ -214,6 +214,21 @@ export function checkInvoiceXml(summary, storedSarTotals) {
     .map((l) => `line ${l.id}: ${formatMinor(l.net)} + ${formatMinor(l.vat)} ≠ ${formatMinor(l.totalWithVat)}`);
   add('line-vat', 'Each line: net + VAT = line total with VAT', lineVatIssues);
 
+  // BR-KSA-EN16931-11: line amount = quantity × net unit price (ZATCA allows ±0.01).
+  const lineQuantityIssues = lines
+    .filter((l) => {
+      const qty = Number(l.quantity);
+      return l.net == null || l.netPrice == null || !Number.isFinite(qty) || Math.abs(Math.round(qty * l.netPrice) - l.net) > 1;
+    })
+    .map((l) => `line ${l.id}: ${l.quantity} × ${formatMinor(l.netPrice)} = ${formatMinor(Math.round(Number(l.quantity) * (l.netPrice ?? 0)))} ≠ ${formatMinor(l.net)}`);
+  add('line-quantity', 'Each line: quantity × net unit price = line amount', lineQuantityIssues);
+
+  // The price discount is per unit: unit price − unit discount = net unit price.
+  const linePriceIssues = lines
+    .filter((l) => l.discount && amountsDiffer(l.grossPrice - l.discount, l.netPrice))
+    .map((l) => `line ${l.id}: ${formatMinor(l.grossPrice)} − ${formatMinor(l.discount)} ≠ ${formatMinor(l.netPrice)}`);
+  add('line-price', 'Each line: unit price − unit discount = net unit price', linePriceIssues);
+
   const expectedTaxExclusive = (totals.lineExtension ?? 0) - totals.allowanceTotal + totals.chargeTotal;
   add('tax-exclusive', 'Total without VAT = lines − allowances + charges', amountsDiffer(expectedTaxExclusive, totals.taxExclusive)
     ? [pair('tax exclusive', totals.taxExclusive, expectedTaxExclusive)]

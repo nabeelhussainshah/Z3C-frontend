@@ -149,7 +149,7 @@ function Amounts({ summary }) {
               <th className={th}>Item</th>
               <th className={`${th} text-right`}>Qty</th>
               <th className={`${th} text-right`}>Unit price</th>
-              <th className={`${th} text-right`}>Discount</th>
+              <th className={`${th} text-right`}>Discount/unit</th>
               <th className={`${th} text-right`}>Net</th>
               <th className={th}>Tax</th>
               <th className={`${th} text-right`}>VAT</th>
