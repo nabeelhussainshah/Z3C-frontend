@@ -1780,7 +1780,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
               <tr>
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3 w-28">Product Code</th>
-                <th className="px-4 py-3 w-20">Qty</th>
+                <th className="px-4 py-3 w-24">Qty</th>
                 <th className="px-4 py-3 w-28">Price ({currencyCode})</th>
                 <th className="px-4 py-3 w-28" title="Discount per unit">Disc./Unit</th>
                 <th className="px-4 py-3 w-24">Disc. %</th>
@@ -1825,7 +1825,9 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
                     <td className="px-4 py-3">
                       <input
                         aria-label={`Quantity, line ${index + 1}`}
-                        className={`w-full bg-transparent p-0 text-sm focus:ring-0 dark:text-white ${quantityErrorLines.includes(index) ? 'border border-tomato rounded px-1' : 'border-none'}`}
+                        // No up/down spinner: in this narrow column it covered the digits and
+                        // a click on it silently changed the quantity.
+                        className={`w-full min-w-[4.5rem] bg-transparent p-0 text-sm focus:ring-0 dark:text-white [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${quantityErrorLines.includes(index) ? 'border border-tomato rounded px-1' : 'border-none'}`}
                         type="number"
                         min="1"
                         max={MAX_LINE_QUANTITY}

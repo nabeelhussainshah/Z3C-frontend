@@ -92,6 +92,23 @@ test.describe('Line quantity on the invoice form', () => {
     expect(body.grandTotal).toBe('310.50');
   });
 
+  test('clicking in the quantity field does not step the value (no spinner), and 7 digits fit', async ({ page }) => {
+    await mockForm(page);
+    await signIn(page);
+    await newInvoice(page);
+    await qty(page).fill('3');
+
+    // The right edge is where the browser's up/down spinner would sit.
+    const box = await qty(page).boundingBox();
+    await qty(page).click({ position: { x: box.width - 4, y: box.height / 2 } });
+    await qty(page).click({ position: { x: box.width - 4, y: box.height - 3 } });
+    await expect(qty(page)).toHaveValue('3');
+
+    await qty(page).fill('1000000');
+    const fits = await qty(page).evaluate((el) => el.scrollWidth <= el.clientWidth);
+    expect(fits).toBe(true);
+  });
+
   test('a percentage discount stays per unit when the quantity changes', async ({ page }) => {
     await mockForm(page);
     await signIn(page);
