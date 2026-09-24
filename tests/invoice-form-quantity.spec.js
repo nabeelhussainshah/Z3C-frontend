@@ -109,6 +109,27 @@ test.describe('Line quantity on the invoice form', () => {
     expect(fits).toBe(true);
   });
 
+  test('a user can replace or edit the quantity with the keyboard', async ({ page }) => {
+    await mockForm(page);
+    await signIn(page);
+    await newInvoice(page);
+    await price(page).fill('10');
+
+    await qty(page).click();
+    await page.keyboard.press('ControlOrMeta+A');
+    await page.keyboard.type('5');
+    await expect(qty(page)).toHaveValue('5');
+
+    await page.keyboard.press('End');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type('12');
+    await expect(qty(page)).toHaveValue('12');
+    await expect(lineTotal(page)).toHaveText('120.00');
+
+    await page.keyboard.press('ArrowUp'); // keyboard stepping still works
+    await expect(qty(page)).toHaveValue('13');
+  });
+
   test('a percentage discount stays per unit when the quantity changes', async ({ page }) => {
     await mockForm(page);
     await signIn(page);
