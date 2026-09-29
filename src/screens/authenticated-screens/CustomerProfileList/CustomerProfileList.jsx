@@ -75,11 +75,19 @@ function CustomerProfileList() {
 
   // *********** Handlers ***********
 
+  // A selection only covers the rows on screen, so it is cleared whenever they change.
+  const clearSelectionThen = (setter) => (value) => {
+    _rowSelection({});
+    setter(value);
+  };
+
   const handleFilterChange = (key, value) => {
+    _rowSelection({});
     _filters((prev) => ({ ...prev, [key]: value }));
   };
 
   const resetFilters = () => {
+    _rowSelection({});
     _filters({ isActive: '', invoiceType: '' });
     _pagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
@@ -121,6 +129,7 @@ function CustomerProfileList() {
             onChange={(e) => _searchQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
+                _rowSelection({});
                 _appliedSearchQuery(searchQuery);
                 _pagination((prev) => ({ ...prev, pageIndex: 0 }));
               }
@@ -232,8 +241,8 @@ function CustomerProfileList() {
               pagination={pagination}
               sorting={sorting}
               rowSelection={rowSelection}
-              _sorting={_sorting}
-              _pagination={_pagination}
+              _sorting={clearSelectionThen(_sorting)}
+              _pagination={clearSelectionThen(_pagination)}
               _rowSelection={_rowSelection}
               isBulkDeleteModalOpen={isBulkDeleteModalOpen}
               onBulkDeleteModalClose={() => _isBulkDeleteModalOpen(false)}
@@ -446,14 +455,17 @@ function CustomerProfilesTableContent({
     }
 
     _isDeleting(true);
-    Promise.all(deletableProfiles.map((profile) => CustomerProfileDeleteRequest(decodedToken, profile._id)))
-      .then(() => {
-        showToast(
-          deletableProfiles.length === 1
-            ? 'Customer profile deleted successfully!'
-            : `${deletableProfiles.length} customer profiles deleted successfully!`,
-          'success'
-        );
+    // One request for the whole selection; the response says which IDs were not found.
+    CustomerProfileDeleteRequest(decodedToken, deletableProfiles.map((profile) => profile._id))
+      .then((response) => {
+        const result = response?.data ?? {};
+        const total = result.requested ?? deletableProfiles.length;
+        const deleted = result.deactivatedCount ?? total;
+        if (deleted === total) {
+          showToast(total === 1 ? 'Customer profile deleted successfully!' : `${total} customer profiles deleted successfully!`, 'success');
+        } else {
+          showToast(`Deleted ${deleted} of ${total} customer profiles. ${total - deleted} could not be found.`, 'error');
+        }
         onBulkDeleteComplete?.();
         refreshProfiles?.();
       })

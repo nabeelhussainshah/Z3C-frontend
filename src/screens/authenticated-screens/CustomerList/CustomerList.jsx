@@ -56,11 +56,19 @@ function CustomerList() {
 
   // *********** Handlers ***********
 
+  // A selection only covers the rows on screen, so it is cleared whenever they change.
+  const clearSelectionThen = (setter) => (value) => {
+    _rowSelection({});
+    setter(value);
+  };
+
   const handleFilterChange = (key, value) => {
+    _rowSelection({});
     _filters((prev) => ({ ...prev, [key]: value }));
   };
 
   const resetFilters = () => {
+    _rowSelection({});
     _filters({ isActive: '' });
     _pagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
@@ -102,6 +110,7 @@ function CustomerList() {
             onChange={(e) => _searchQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
+                _rowSelection({});
                 _appliedSearchQuery(searchQuery);
                 _pagination((prev) => ({ ...prev, pageIndex: 0 }));
               }
@@ -198,8 +207,8 @@ function CustomerList() {
               pagination={pagination}
               sorting={sorting}
               rowSelection={rowSelection}
-              _sorting={_sorting}
-              _pagination={_pagination}
+              _sorting={clearSelectionThen(_sorting)}
+              _pagination={clearSelectionThen(_pagination)}
               _rowSelection={_rowSelection}
               isBulkDeleteModalOpen={isBulkDeleteModalOpen}
               onBulkDeleteModalClose={() => _isBulkDeleteModalOpen(false)}
@@ -419,14 +428,17 @@ function CustomersTableContent({
     }
 
     _isDeleting(true);
-    Promise.all(deletableCustomers.map((customer) => CustomerDeleteRequest(decodedToken, customer._id)))
-      .then(() => {
-        showToast(
-          deletableCustomers.length === 1
-            ? 'Customer deleted successfully!'
-            : `${deletableCustomers.length} customers deleted successfully!`,
-          'success'
-        );
+    // One request for the whole selection; the response says which IDs were not found.
+    CustomerDeleteRequest(decodedToken, deletableCustomers.map((customer) => customer._id))
+      .then((response) => {
+        const result = response?.data ?? {};
+        const total = result.requested ?? deletableCustomers.length;
+        const deleted = result.deactivatedCount ?? total;
+        if (deleted === total) {
+          showToast(total === 1 ? 'Customer deleted successfully!' : `${total} customers deleted successfully!`, 'success');
+        } else {
+          showToast(`Deleted ${deleted} of ${total} customers. ${total - deleted} could not be found.`, 'error');
+        }
         onBulkDeleteComplete?.();
         refreshCustomers?.();
       })

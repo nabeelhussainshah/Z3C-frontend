@@ -1,13 +1,15 @@
 import { getApiUrl, defaultHeaders, handleNetworkError, HANDLED_RESPONSE_ERROR } from './api.config';
 
-const CustomerDeleteRequest = (token, customerId) => {
+/** Deactivates one or many records in a single request; resolves to { requested, deactivatedCount, deactivated, notFound, invalid }. */
+const CustomerDeleteRequest = (token, ids) => {
   const headers = {
     ...defaultHeaders,
     'Authorization': `Bearer ${token}`
   };
-  return fetch(getApiUrl(`/customers/${customerId}`), { 
+  return fetch(getApiUrl('/customers'), {
     method: 'DELETE',
     headers: headers,
+    body: JSON.stringify({ customerIds: ids }),
   })
     .then(async (res) => {
       if (!res.ok) {
