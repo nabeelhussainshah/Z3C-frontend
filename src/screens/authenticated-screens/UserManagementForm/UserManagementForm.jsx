@@ -9,7 +9,7 @@ import { UserCreateRequest, UserDetailRequest, UserUpdateRequest } from '../../.
 
 // Utils
 import { Footer, ErrorFallback } from '../../../components';
-import { showToast, validateSubmissionData, decodeString, parseLoginInfo, getNormalizedModulePermissions } from '../../../utils';
+import { showToast, preventEnterSubmit, validateSubmissionData, decodeString, parseLoginInfo, getNormalizedModulePermissions } from '../../../utils';
 import { auth, loginInfo } from '../../../atoms';
 
 const PERMISSION_MODULES = ['invoice', 'customer', 'profile', 'companyProfile', 'user', 'dashboard', 'zatcaReporting', 'audit'];
@@ -45,10 +45,8 @@ const getAllPermissions = () =>
 
 const INITIAL_FORM_DATA = {
   data: {
-    authProvider: 'local',
     username: '',
     email: '',
-    adUserId: '',
     password: '',
     confirmPassword: '',
     permissions: getEmptyPermissions(),
@@ -60,25 +58,6 @@ const INITIAL_FORM_DATA = {
     password: { isRequired: true, regex: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/ },
     username: { isRequired: true, label: "User Name" },
     email: { isRequired: true, regex: /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/ },
-  },
-  errors: {},
-};
-
-const AD_INITIAL_FORM_DATA = {
-  data: {
-    authProvider: 'ad',
-    username: '',
-    email: '',
-    adUserId: '',
-    password: '',
-    confirmPassword: '',
-    permissions: getEmptyPermissions(),
-    role: 'Admin',
-    isActive: true,
-    isAdmin: false,
-  },
-  validations: {
-    adUserId: { isRequired: true, label: "AD Username", regex: /^[A-Za-z0-9._-]{3,}$/ },
   },
   errors: {},
 };
@@ -140,20 +119,16 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
   const [isShowPassword, _isShowPassword] = useState(false);
   const [isReadOnly, _isReadOnly] = useState(true);
   const [isShowConfirmPassword, _isShowConfirmPassword] = useState(false);
-  const [adLookup, _adLookup] = useState({ status: 'idle', data: null, error: null }); // idle | loading | found | error
 
   useEffect(() => {
     if (userData?.data) {
       const apiData = userData.data;
-      const isAd = apiData.authProvider === 'ad';
       _formData(old => ({
         ...old,
         data: {
           ...old.data,
-          authProvider: apiData.authProvider || 'local',
           username: apiData.username || '',
           email: apiData.email || '',
-          adUserId: apiData.adUserId || '',
           permissions: (() => {
             if (apiData.permissions && typeof apiData.permissions === 'object') {
               return PERMISSION_MODULES.reduce((acc, module) => {
@@ -180,13 +155,11 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
           password: '',
           confirmPassword: '',
         },
-        validations: isAd
-          ? {}
-          : {
-              ...old.validations,
-              password: { isRequired: false, label: "Password" },
-              confirmPassword: { isRequired: false, label: "Confirm Password" },
-            },
+        validations: {
+          ...old.validations,
+          password: { isRequired: false, label: "Password" },
+          confirmPassword: { isRequired: false, label: "Confirm Password" },
+        },
       }));
     } else if (userData?.isError) {
       _formData({ ...INITIAL_FORM_DATA });
@@ -197,9 +170,6 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
 
   // *********** Handlers ***********
   const handleChangeFormData = (e) => {
-    if (e.target.name === 'adUserId') {
-      _adLookup({ status: 'idle', data: null, error: null });
-    }
     _formData(old => ({
       ...old,
       data: {
@@ -207,21 +177,6 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
         [e.target.name]: e.target.value,
       },
     }));
-  };
-
-  const handleChangeAuthProvider = (value) => {
-    _adLookup({ status: 'idle', data: null, error: null });
-    if (value === 'ad') {
-      _formData({ ...AD_INITIAL_FORM_DATA });
-    } else {
-      _formData({ ...INITIAL_FORM_DATA });
-    }
-  };
-
-  const handleAdUserIdBlur = () => {
-    const sam = formData.data.adUserId?.trim();
-    if (!sam || sam.length < 3) return;
-    _adLookup({ status: 'error', data: null, error: 'Active Directory lookup is not available.' });
   };
 
   const handleToggleIsActive = (e) => {
@@ -302,61 +257,43 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
   const handleSubmitForm = (e) => {
     if (e) e.preventDefault();
 
-    const isAd = formData.data.authProvider === 'ad';
-
-    if (isAd && !id && adLookup.status !== 'found') {
-      showToast('Please verify the AD username first — tab out of the field to look up the account', 'error');
+    if (formData.data.password && formData.data.password !== formData.data.confirmPassword) {
+      showToast('Passwords do not match', 'error');
       return;
     }
 
-    if (!isAd) {
-      if (formData.data.password && formData.data.password !== formData.data.confirmPassword) {
-        showToast('Passwords do not match', 'error');
-        return;
-      }
-
-      const hasAnyPermission = PERMISSION_MODULES.some((module) => {
-        const mp = formData.data.permissions[module];
-        return mp && (mp.read || mp.create || mp.update || mp.delete);
-      });
-      if (!hasAnyPermission) {
-        showToast('Please grant at least one permission', 'error');
-        return;
-      }
+    const hasAnyPermission = PERMISSION_MODULES.some((module) => {
+      const mp = formData.data.permissions[module];
+      return mp && (mp.read || mp.create || mp.update || mp.delete);
+    });
+    if (!hasAnyPermission) {
+      showToast('Please grant at least one permission', 'error');
+      return;
     }
 
     if (handleValidateForm()) {
       _isLoading(true);
 
-      let payload;
-      if (isAd) {
-        payload = {
-          authProvider: 'ad',
-          adUserId: formData.data.adUserId,
-          isActive: !!formData.data.isActive,
-        };
-      } else {
-        payload = {
-          username: formData.data.username,
-          email: formData.data.email,
-          isActive: !!formData.data.isActive,
-          isAdmin: !!formData.data.isAdmin,
-          role: formData.data.role || 'Admin',
-          permissions: PERMISSION_MODULES.reduce((acc, module) => {
-            const mp = formData.data.permissions[module] || {};
-            const isReadOnlyModule = READ_ONLY_MODULES.includes(module);
-            acc[module] = {
-              read: !!mp.read,
-              create: isReadOnlyModule ? false : !!mp.create,
-              update: isReadOnlyModule ? false : !!mp.update,
-              delete: isReadOnlyModule ? false : !!mp.delete,
-            };
-            return acc;
-          }, {}),
-        };
-        if (formData.data.password) {
-          payload.password = formData.data.password;
-        }
+      const payload = {
+        username: formData.data.username,
+        email: formData.data.email,
+        isActive: !!formData.data.isActive,
+        isAdmin: !!formData.data.isAdmin,
+        role: formData.data.role || 'Admin',
+        permissions: PERMISSION_MODULES.reduce((acc, module) => {
+          const mp = formData.data.permissions[module] || {};
+          const isReadOnlyModule = READ_ONLY_MODULES.includes(module);
+          acc[module] = {
+            read: !!mp.read,
+            create: isReadOnlyModule ? false : !!mp.create,
+            update: isReadOnlyModule ? false : !!mp.update,
+            delete: isReadOnlyModule ? false : !!mp.delete,
+          };
+          return acc;
+        }, {}),
+      };
+      if (formData.data.password) {
+        payload.password = formData.data.password;
       }
 
       const request = id
@@ -418,7 +355,6 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
 
   const PERMISSION_ROW = (module, layout) => {
     const mp = formData.data.permissions[module] || {};
-    const isAd = formData.data.authProvider === 'ad';
     const moduleActions = READ_ONLY_MODULES.includes(module) ? ['read'] : CRUD_ACTIONS;
     const allChecked = moduleActions.every((a) => !!mp[a]);
     const someChecked = moduleActions.some((a) => !!mp[a]);
@@ -436,7 +372,6 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
             {PERMISSION_CHECKBOX({
               checked: allChecked,
               indeterminate: someChecked && !allChecked,
-              disabled: isAd,
               label: 'All',
               onChange: (e) => handleToggleModuleAll(module, e.target.checked),
             })}
@@ -450,7 +385,6 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
                   </span>
                 ) : PERMISSION_CHECKBOX({
                   checked: !!mp[action],
-                  disabled: isAd,
                   label: action.charAt(0).toUpperCase() + action.slice(1),
                   onChange: () => handleTogglePermission(module, action),
                 })}
@@ -474,7 +408,6 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
               <span className="inline-flex justify-center">
                 {PERMISSION_CHECKBOX({
                   checked: !!mp[action],
-                  disabled: isAd,
                   ariaLabel: `${MODULE_LABELS[module]} ${action}`,
                   onChange: () => handleTogglePermission(module, action),
                 })}
@@ -487,7 +420,6 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
             {PERMISSION_CHECKBOX({
               checked: allChecked,
               indeterminate: someChecked && !allChecked,
-              disabled: isAd,
               ariaLabel: `${MODULE_LABELS[module]} all permissions`,
               onChange: (e) => handleToggleModuleAll(module, e.target.checked),
             })}
@@ -522,172 +454,80 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
   );
 
   const ACCOUNT_SECTION = () => {
-    const isAd = formData.data.authProvider === 'ad';
-
     return (
       <section className="breeze-form-section">
         {SECTION_HEADER({
           icon: 'manage_accounts',
           title: 'Account details',
-          lede: isAd
-            ? 'Active Directory identity used to sign in to the dashboard.'
-            : 'Local username, email, and how this account authenticates.',
+          lede: 'Local username, email, and how this account authenticates.',
         })}
 
-        {(!isAd || id) && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5">
-            <div className="breeze-form-field">
-              <label className="breeze-field__label" htmlFor="user-username">
-                User Name
-                {isAd ? (
-                  <span className="font-normal text-[var(--z3c-hint)]"> (from AD)</span>
-                ) : (
-                  <span className="breeze-form-required" aria-hidden="true"> *</span>
-                )}
-              </label>
-              <input
-                id="user-username"
-                type="text"
-                name="username"
-                value={formData.data.username}
-                onChange={isAd ? undefined : handleChangeFormData}
-                placeholder="Enter username"
-                readOnly={isAd || isReadOnly}
-                onFocus={isAd ? undefined : () => _isReadOnly(false)}
-                onBlur={isAd ? undefined : () => _isReadOnly(true)}
-                aria-invalid={Boolean(formData.errors.username)}
-                aria-describedby={formData.errors.username ? 'user-username-error' : undefined}
-                className={inputClassName('username', isAd ? 'breeze-form-input--locked' : '')}
-              />
-              {formData.errors.username ? (
-                <span className="breeze-field__error" id="user-username-error">
-                  {formData.errors.username}
-                </span>
-              ) : null}
-            </div>
-
-            <div className="breeze-form-field">
-              <label className="breeze-field__label" htmlFor="user-email">
-                Email
-                {isAd ? (
-                  <span className="font-normal text-[var(--z3c-hint)]"> (from AD)</span>
-                ) : (
-                  <span className="breeze-form-required" aria-hidden="true"> *</span>
-                )}
-              </label>
-              <input
-                id="user-email"
-                type="email"
-                name="email"
-                value={formData.data.email}
-                onChange={isAd ? undefined : handleChangeFormData}
-                placeholder="Enter email"
-                readOnly={isAd || isReadOnly}
-                onFocus={isAd ? undefined : () => _isReadOnly(false)}
-                onBlur={isAd ? undefined : () => _isReadOnly(true)}
-                aria-invalid={Boolean(formData.errors.email)}
-                aria-describedby={formData.errors.email ? 'user-email-error' : undefined}
-                className={inputClassName('email', isAd ? 'breeze-form-input--locked' : '')}
-              />
-              {formData.errors.email ? (
-                <span className="breeze-field__error" id="user-email-error">
-                  {formData.errors.email}
-                </span>
-              ) : null}
-            </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5">
+          <div className="breeze-form-field">
+            <label className="breeze-field__label" htmlFor="user-username">
+              User Name
+              <span className="breeze-form-required" aria-hidden="true"> *</span>
+            </label>
+            <input
+              id="user-username"
+              type="text"
+              name="username"
+              value={formData.data.username}
+              onChange={handleChangeFormData}
+              placeholder="Enter username"
+              readOnly={isReadOnly}
+              onFocus={() => _isReadOnly(false)}
+              onBlur={() => _isReadOnly(true)}
+              aria-invalid={Boolean(formData.errors.username)}
+              aria-describedby={formData.errors.username ? 'user-username-error' : undefined}
+              className={inputClassName('username')}
+            />
+            {formData.errors.username ? (
+              <span className="breeze-field__error" id="user-username-error">
+                {formData.errors.username}
+              </span>
+            ) : null}
           </div>
-        )}
 
-        {isAd && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5">
-            <div className="breeze-form-field">
-              <label className="breeze-field__label" htmlFor="user-adUserId">
-                AD Username (sAMAccountName)
-                {!id ? <span className="breeze-form-required" aria-hidden="true"> *</span> : null}
-              </label>
-              {id ? (
-                <div className="breeze-form-input breeze-form-input--locked flex items-center">
-                  {formData.data.adUserId || '—'}
-                </div>
-              ) : (
-                <Fragment>
-                  <div className="breeze-field__control">
-                    <input
-                      id="user-adUserId"
-                      type="text"
-                      name="adUserId"
-                      value={formData.data.adUserId}
-                      onChange={handleChangeFormData}
-                      onBlur={handleAdUserIdBlur}
-                      placeholder="e.g. jdoe"
-                      readOnly={isReadOnly}
-                      onFocus={() => _isReadOnly(false)}
-                      aria-invalid={Boolean(formData.errors.adUserId) || adLookup.status === 'error'}
-                      aria-describedby={formData.errors.adUserId ? 'user-adUserId-error' : 'user-adUserId-hint'}
-                      className={inputClassName(
-                        'adUserId',
-                        `pr-11 ${
-                          adLookup.status === 'found'
-                            ? 'breeze-form-input--success'
-                            : adLookup.status === 'error'
-                              ? 'breeze-form-input--invalid'
-                              : ''
-                        }`,
-                      )}
-                    />
-                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                      {adLookup.status === 'loading' && (
-                        <span className="material-symbols-outlined animate-spin text-[18px] text-[var(--z3c-subtle)]">sync</span>
-                      )}
-                      {adLookup.status === 'found' && (
-                        <span className="material-symbols-outlined text-[18px] text-[var(--z3c-success-ink)]">check_circle</span>
-                      )}
-                      {adLookup.status === 'error' && (
-                        <span className="material-symbols-outlined text-[18px] text-[var(--z3c-danger)]">error</span>
-                      )}
-                    </span>
-                  </div>
-                  {adLookup.status === 'idle' && (
-                    <p className="breeze-form-hint" id="user-adUserId-hint">
-                      Enter the user&apos;s Windows login name and tab out to verify the account in AD.
-                    </p>
-                  )}
-                  {adLookup.status === 'error' && (
-                    <p className="breeze-field__error">{adLookup.error}</p>
-                  )}
-                  {adLookup.status === 'found' && adLookup.data?.alreadyProvisioned && (
-                    <div className="mt-2 flex items-start gap-2 rounded-[10px] border border-[rgba(232,198,153,0.7)] bg-[var(--z3c-warning-bg)] px-3 py-2.5 text-[12.5px] leading-[18px] text-[var(--z3c-warning-ink)]">
-                      <span className="material-symbols-outlined text-[18px]" aria-hidden="true">warning</span>
-                      <span>This account is already provisioned — saving will result in a conflict error.</span>
-                    </div>
-                  )}
-                </Fragment>
-              )}
-              {formData.errors.adUserId ? (
-                <span className="breeze-field__error" id="user-adUserId-error">
-                  {formData.errors.adUserId}
-                </span>
-              ) : null}
-            </div>
+          <div className="breeze-form-field">
+            <label className="breeze-field__label" htmlFor="user-email">
+              Email
+              <span className="breeze-form-required" aria-hidden="true"> *</span>
+            </label>
+            <input
+              id="user-email"
+              type="email"
+              name="email"
+              value={formData.data.email}
+              onChange={handleChangeFormData}
+              placeholder="Enter email"
+              readOnly={isReadOnly}
+              onFocus={() => _isReadOnly(false)}
+              onBlur={() => _isReadOnly(true)}
+              aria-invalid={Boolean(formData.errors.email)}
+              aria-describedby={formData.errors.email ? 'user-email-error' : undefined}
+              className={inputClassName('email')}
+            />
+            {formData.errors.email ? (
+              <span className="breeze-field__error" id="user-email-error">
+                {formData.errors.email}
+              </span>
+            ) : null}
           </div>
-        )}
+        </div>
+
       </section>
     );
   };
 
   const PERMISSIONS_SECTION = () => {
-    const isAd = formData.data.authProvider === 'ad';
-    if (isAd && !id) return null;
-
     return (
       <section className="breeze-form-section">
         {SECTION_HEADER({
           icon: 'admin_panel_settings',
           title: 'Permissions',
-          lede: isAd
-            ? 'Role and access are determined by this user\'s AD group membership.'
-            : 'Grant at least one module permission for this local account.',
-          extra: !isAd ? (
+          lede: 'Grant at least one module permission for this local account.',
+          extra: (
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <button
                 type="button"
@@ -705,23 +545,14 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
                 Revoke All
               </button>
             </div>
-          ) : null,
+          ),
         })}
 
-        {isAd && (
-          <div className="flex items-start gap-2 rounded-[12px] border border-dashed border-[var(--z3c-border-outline)] bg-[rgba(43,124,245,0.06)] px-3 py-2.5 text-[11.5px] leading-4 text-[var(--z3c-subtle)]">
-            <span className="material-symbols-outlined shrink-0 text-[16px] text-[var(--z3c-icon-strong)]" aria-hidden="true">info</span>
-            <span>
-              Role and permissions are determined by this user&apos;s AD group membership (Admin, Manager, Accountant, or Viewer) on first login.
-            </span>
-          </div>
-        )}
-
-        <div className={`md:hidden flex flex-col gap-3${isAd ? ' opacity-60 pointer-events-none' : ''}`}>
+        <div className="md:hidden flex flex-col gap-3">
           {PERMISSION_MODULES.map((module) => PERMISSION_ROW(module, 'card'))}
         </div>
 
-        <div className={`hidden md:block overflow-x-auto rounded-[14px] border border-[var(--z3c-border-card)] bg-white/40 dark:border-white/10 dark:bg-white/[0.04]${isAd ? ' opacity-60 pointer-events-none' : ''}`}>
+        <div className="hidden md:block overflow-x-auto rounded-[14px] border border-[var(--z3c-border-card)] bg-white/40 dark:border-white/10 dark:bg-white/[0.04]">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-[rgba(224,237,244,0.45)] text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--z3c-subtle)] dark:bg-white/[0.04] dark:text-[#9bb6d4]">
               <tr>
@@ -744,105 +575,100 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
   };
 
   const SECURITY_SECTION = () => {
-    const isAd = formData.data.authProvider === 'ad';
     const passwordRequired = !!formData.validations.password?.isRequired;
 
     return (
       <section className="breeze-form-section">
         {SECTION_HEADER({
           icon: 'lock',
-          title: isAd ? 'Account status' : 'Security & status',
-          lede: isAd
-            ? 'Control whether this Active Directory user can sign in.'
-            : id
-              ? 'Leave password blank to keep the current value.'
-              : 'Set a strong password and whether this account is active.',
+          title: 'Security & status',
+          lede: id
+            ? 'Leave password blank to keep the current value.'
+            : 'Set a strong password and whether this account is active.',
         })}
 
-        {!isAd && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5">
-            <div className="breeze-form-field">
-              <label className="breeze-field__label" htmlFor="user-password">
-                Password
-                {passwordRequired ? <span className="breeze-form-required" aria-hidden="true"> *</span> : null}
-              </label>
-              <div className="breeze-field__control">
-                <input
-                  id="user-password"
-                  type={isShowPassword ? 'text' : 'password'}
-                  name="password"
-                  value={formData.data.password}
-                  onChange={handleChangeFormData}
-                  placeholder="••••••••"
-                  autoComplete="new-password"
-                  readOnly={isReadOnly}
-                  onFocus={() => _isReadOnly(false)}
-                  onBlur={() => _isReadOnly(true)}
-                  aria-invalid={Boolean(formData.errors.password)}
-                  aria-describedby={formData.errors.password ? 'user-password-error' : undefined}
-                  className={inputClassName('password', 'pr-11')}
-                />
-                <button
-                  type="button"
-                  className="breeze-field__reveal"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => _isShowPassword((prev) => !prev)}
-                  aria-label={isShowPassword ? 'Hide password' : 'Show password'}
-                >
-                  <span className="material-symbols-outlined">
-                    {isShowPassword ? 'visibility' : 'visibility_off'}
-                  </span>
-                </button>
-              </div>
-              {formData.errors.password ? (
-                <span className="breeze-field__error" id="user-password-error">
-                  {formData.errors.password?.includes('valid')
-                    ? 'Password should be alphanumeric with special characters'
-                    : formData.errors.password}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5">
+          <div className="breeze-form-field">
+            <label className="breeze-field__label" htmlFor="user-password">
+              Password
+              {passwordRequired ? <span className="breeze-form-required" aria-hidden="true"> *</span> : null}
+            </label>
+            <div className="breeze-field__control">
+              <input
+                id="user-password"
+                type={isShowPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.data.password}
+                onChange={handleChangeFormData}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                readOnly={isReadOnly}
+                onFocus={() => _isReadOnly(false)}
+                onBlur={() => _isReadOnly(true)}
+                aria-invalid={Boolean(formData.errors.password)}
+                aria-describedby={formData.errors.password ? 'user-password-error' : undefined}
+                className={inputClassName('password', 'pr-11')}
+              />
+              <button
+                type="button"
+                className="breeze-field__reveal"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => _isShowPassword((prev) => !prev)}
+                aria-label={isShowPassword ? 'Hide password' : 'Show password'}
+              >
+                <span className="material-symbols-outlined">
+                  {isShowPassword ? 'visibility' : 'visibility_off'}
                 </span>
-              ) : (
-                <p className="breeze-form-hint">
-                  Must include upper and lower case letters, a number, and a special character.
-                </p>
-              )}
+              </button>
             </div>
-
-            <div className="breeze-form-field">
-              <label className="breeze-field__label" htmlFor="user-confirmPassword">
-                Confirm Password
-                {passwordRequired ? <span className="breeze-form-required" aria-hidden="true"> *</span> : null}
-              </label>
-              <div className="breeze-field__control">
-                <input
-                  id="user-confirmPassword"
-                  type={isShowConfirmPassword ? 'text' : 'password'}
-                  name="confirmPassword"
-                  value={formData.data.confirmPassword}
-                  onChange={handleChangeFormData}
-                  placeholder="••••••••"
-                  autoComplete="new-password"
-                  className={inputClassName('confirmPassword', 'pr-11')}
-                />
-                <button
-                  type="button"
-                  className="breeze-field__reveal"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => _isShowConfirmPassword((prev) => !prev)}
-                  aria-label={isShowConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-                >
-                  <span className="material-symbols-outlined">
-                    {isShowConfirmPassword ? 'visibility' : 'visibility_off'}
-                  </span>
-                </button>
-              </div>
-              {formData.errors.confirmPassword ? (
-                <span className="breeze-field__error" id="user-confirmPassword-error">
-                  {formData.errors.confirmPassword}
-                </span>
-              ) : null}
-            </div>
+            {formData.errors.password ? (
+              <span className="breeze-field__error" id="user-password-error">
+                {formData.errors.password?.includes('valid')
+                  ? 'Password should be alphanumeric with special characters'
+                  : formData.errors.password}
+              </span>
+            ) : (
+              <p className="breeze-form-hint">
+                Must include upper and lower case letters, a number, and a special character.
+              </p>
+            )}
           </div>
-        )}
+
+          <div className="breeze-form-field">
+            <label className="breeze-field__label" htmlFor="user-confirmPassword">
+              Confirm Password
+              {passwordRequired ? <span className="breeze-form-required" aria-hidden="true"> *</span> : null}
+            </label>
+            <div className="breeze-field__control">
+              <input
+                id="user-confirmPassword"
+                type={isShowConfirmPassword ? 'text' : 'password'}
+                name="confirmPassword"
+                value={formData.data.confirmPassword}
+                onChange={handleChangeFormData}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                className={inputClassName('confirmPassword', 'pr-11')}
+              />
+              <button
+                type="button"
+                className="breeze-field__reveal"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => _isShowConfirmPassword((prev) => !prev)}
+                aria-label={isShowConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+              >
+                <span className="material-symbols-outlined">
+                  {isShowConfirmPassword ? 'visibility' : 'visibility_off'}
+                </span>
+              </button>
+            </div>
+            {formData.errors.confirmPassword ? (
+              <span className="breeze-field__error" id="user-confirmPassword-error">
+                {formData.errors.confirmPassword}
+              </span>
+            ) : null}
+          </div>
+        </div>
 
         <label className="breeze-check w-fit">
           <input
@@ -892,7 +718,7 @@ function UserManagementFormContent({ id, userPromise, decodedToken, navigate }) 
 
   const USER_FORM = () => (
     <div className="breeze-form-card">
-      <form className="breeze-form" onSubmit={handleSubmitForm} noValidate>
+      <form className="breeze-form" onSubmit={handleSubmitForm} onKeyDown={preventEnterSubmit} noValidate>
         {userData?.isError && (
           <div className="breeze-alert" role="alert">
             <span className="material-symbols-outlined">error</span>
