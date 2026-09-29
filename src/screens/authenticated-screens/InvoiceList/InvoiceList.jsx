@@ -1,5 +1,6 @@
 // Packages
 import { Fragment, useMemo, useState, Suspense, use, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useReactTable, getCoreRowModel, getSortedRowModel, getPaginationRowModel, flexRender } from '@tanstack/react-table';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -20,7 +21,7 @@ import {
 // Utils 
 import { auth, loginInfo } from '../../../atoms';
 import { Footer, ErrorFallback, ConfirmModal, ZatcaXmlViewer } from '../../../components';
-import { DEFAULT_PAGE_SIZE, PAGINATION_PAGE_SIZES, decodeString, showToast, parseLoginInfo, getNormalizedModulePermissions, INVOICE_STATUSES } from '../../../utils';
+import { DEFAULT_PAGE_SIZE, PAGINATION_PAGE_SIZES, decodeString, showToast, parseLoginInfo, getNormalizedModulePermissions, INVOICE_STATUSES, isInvoiceDeletable as canDeleteInvoice } from '../../../utils';
 
 const STATUS_FILTER_OPTIONS = [
   'DRAFT', 'SUBMITTED', 'PENDING_SUBMISSION',
@@ -81,11 +82,19 @@ function InvoiceList() {
 
   // *********** Handlers ***********
 
+  // A selection only covers the rows on screen, so it is cleared whenever they change.
+  const clearSelectionThen = (setter) => (value) => {
+    _rowSelection({});
+    setter(value);
+  };
+
   const handleFilterChange = (key, value) => {
+    _rowSelection({});
     _filters((prev) => ({ ...prev, [key]: value }));
   };
 
   const resetFilters = () => {
+    _rowSelection({});
     _filters({
       status: '',
       invoiceType: '',
@@ -133,6 +142,7 @@ function InvoiceList() {
             onChange={(e) => _searchQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
+                _rowSelection({});
                 _appliedSearchQuery(searchQuery);
                 _pagination((prev) => ({ ...prev, pageIndex: 0 }));
               }
@@ -288,9 +298,9 @@ function InvoiceList() {
             <InvoicesTableContent
               invoicesPromise={invoicesPromise}
               pagination={pagination}
-              _pagination={_pagination}
+              _pagination={clearSelectionThen(_pagination)}
               sorting={sorting}
-              _sorting={_sorting}
+              _sorting={clearSelectionThen(_sorting)}
               rowSelection={rowSelection}
               _rowSelection={_rowSelection}
               isBulkDeleteModalOpen={isBulkDeleteModalOpen}
@@ -433,11 +443,10 @@ function InvoicesTableContent({
     _clearanceResponseToShow(null);
   };
 
-  const isInvoiceDeletable = useCallback((invoice) => {
-    if (!invoicePerms.delete || !invoice?._id) return false;
-    const statusConfig = INVOICE_STATUSES.find((status) => status.name === invoice.status);
-    return !!statusConfig?.canDelete;
-  }, [invoicePerms.delete]);
+  const isInvoiceDeletable = useCallback(
+    (invoice) => canDeleteInvoice(invoice, invoicePerms.delete),
+    [invoicePerms.delete]
+  );
 
   const handleCloseBulkDeleteModal = () => {
     if (isBulkDeleting) return;
@@ -618,9 +627,11 @@ function InvoicesTableContent({
           <input
             type="checkbox"
             checked={row.getIsSelected()}
+            disabled={!row.getCanSelect()}
             onChange={row.getToggleSelectedHandler()}
             onClick={(e) => e.stopPropagation()}
             className="breeze-check__box"
+            aria-label={`Select ${row.original.invoiceNumber}`}
           />
         ),
         enableSorting: false,
@@ -722,7 +733,10 @@ function InvoicesTableContent({
           const statusConfig = INVOICE_STATUSES.find(
             (status) => status.name === row.original.status
           );
+          const canDelete = isInvoiceDeletable(row.original);
           const canReportToZatca = !!statusConfig?.canSubmitToZatca;
+          const canCreateCreditNote = !!statusConfig?.canCreateCreditNote;
+          const canCreateDebitNote = !!statusConfig?.canCreateDebitNote;
           const canCheckCompliance = !!statusConfig?.canCheckCompliance;
           const canPrintProforma = row.original.status === 'DRAFT';
           const hasZatcaXml = [row.original.compliance, row.original.clearance].some(
@@ -856,6 +870,7 @@ function InvoicesTableContent({
       handleReportToZatca,
       handleCheckCompliance,
       actionBusyId,
+      isInvoiceDeletable,
     ]
   );
 
@@ -945,7 +960,7 @@ function InvoicesTableContent({
       rowSelection,
       pagination,
     },
-    enableRowSelection: true,
+    enableRowSelection: (row) => isInvoiceDeletable(row.original),
   });
 
   const handleConfirmBulkDelete = useCallback(() => {
@@ -960,19 +975,18 @@ function InvoicesTableContent({
     }
 
     _isBulkDeleting(true);
-    Promise.all(deletableInvoices.map((invoice) => InvoiceDeleteRequest(decodedToken, invoice._id)))
-      .then(() => {
-        showToast(
-          deletableInvoices.length === 1
-            ? 'Invoice deleted successfully!'
-            : `${deletableInvoices.length} invoices deleted successfully!`,
-          'success'
-        );
+    // Each failed request shows its own error; the summary says what happened overall.
+    Promise.allSettled(deletableInvoices.map((invoice) => InvoiceDeleteRequest(decodedToken, invoice._id)))
+      .then((results) => {
+        const deleted = results.filter((r) => r.status === 'fulfilled').length;
+        const total = results.length;
+        if (deleted === total) {
+          showToast(total === 1 ? 'Invoice deleted successfully!' : `${total} invoices deleted successfully!`, 'success');
+        } else {
+          showToast(`Deleted ${deleted} of ${total} invoices. ${total - deleted} could not be deleted.`, 'error');
+        }
         onBulkDeleteComplete?.();
         refreshInvoices?.();
-      })
-      .catch((err) => {
-        showToast(err?.message || 'Failed to delete selected invoices', 'error');
       })
       .finally(() => {
         _isBulkDeleting(false);
@@ -1400,8 +1414,14 @@ function InvoicesTableContent({
       {PAGINATION_SECTION()}
       {CONFIRM_DELETE_MODAL()}
       {CONFIRM_BULK_DELETE_MODAL()}
-      {COMPLIANCE_RESPONSE_MODAL()}
-      {ZATCA_RESPONSE_MODAL()}
+      {/* On <body>: the table card's backdrop-filter would otherwise contain and clip fixed overlays. */}
+      {createPortal(
+        <Fragment>
+          {COMPLIANCE_RESPONSE_MODAL()}
+          {ZATCA_RESPONSE_MODAL()}
+        </Fragment>,
+        document.body
+      )}
       {xmlInvoice && (
         <ZatcaXmlViewer
           key={xmlInvoice.id}

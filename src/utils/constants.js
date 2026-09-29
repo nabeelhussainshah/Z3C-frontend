@@ -46,7 +46,7 @@ export const INVOICE_STATUSES = [
   {
     name: "REJECTED",
     canEdit: true,
-    canDelete: true,
+    canDelete: false, // the backend deletes DRAFT invoices only
     canSubmitToZatca: true,
     canCheckCompliance: true,
     color: "bg-red-300"
@@ -70,7 +70,7 @@ export const INVOICE_STATUSES = [
   {
     name: "COMPLIANCE_COMPLETED",
     canEdit: true,
-    canDelete: true,
+    canDelete: false, // the backend deletes DRAFT invoices only
     canSubmitToZatca: true,
     canCheckCompliance: true,
     color: "bg-green-300"

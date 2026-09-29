@@ -1,5 +1,6 @@
 // Packages
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAtomValue } from 'jotai';
 
 // APIs
@@ -414,7 +415,8 @@ function ZatcaXmlViewer({ invoiceId, invoiceNumber, onClose }) {
   // Default to the most advanced step: cleared, then submitted, then compliance.
   const active = documents.find((d) => d.kind === activeKind) ?? documents[documents.length - 1] ?? null;
 
-  return (
+  // Rendered on <body> so no page container (a card with backdrop-filter, a form) can clip or contain it.
+  return createPortal(
     <Fragment>
       <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
@@ -480,7 +482,8 @@ function ZatcaXmlViewer({ invoiceId, invoiceNumber, onClose }) {
           </div>
         </div>
       </div>
-    </Fragment>
+    </Fragment>,
+    document.body
   );
 }
 
