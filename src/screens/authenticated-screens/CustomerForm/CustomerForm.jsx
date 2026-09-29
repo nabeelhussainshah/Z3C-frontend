@@ -11,7 +11,7 @@ import { CustomerCreateRequest, CustomerDetailRequest, CustomerUpdateRequest, Cu
 // Utils
 import { auth, loginInfo } from '../../../atoms';
 import { Footer, ErrorFallback } from '../../../components';
-import { showToast, validateSubmissionData, decodeString, parseLoginInfo, getNormalizedModulePermissions } from '../../../utils';
+import { showToast, preventEnterSubmit, validateSubmissionData, decodeString, parseLoginInfo, getNormalizedModulePermissions } from '../../../utils';
 
 const INITIAL_FORM_DATA = {
   data: {
@@ -704,7 +704,7 @@ function CustomerFormContent({ id, customerPromise, decodedToken, navigate }) {
 
   const CUSTOMER_FORM = () => (
     <div className="breeze-form-card">
-      <form className="breeze-form" onSubmit={handleSubmitForm} noValidate>
+      <form className="breeze-form" onSubmit={handleSubmitForm} onKeyDown={preventEnterSubmit} noValidate>
         {customerData?.isError && (
           <div className="breeze-alert" role="alert">
             <span className="material-symbols-outlined">error</span>

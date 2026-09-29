@@ -33,6 +33,19 @@ export const showToast = (message, type = 'info', options = {}) => {
   });
 };
 
+/**
+ * Use as a form's onKeyDown: Enter in a text/number field must not submit the
+ * form (saving stays an explicit click on Save). Dropdowns, checkboxes and
+ * buttons keep their own Enter behaviour.
+ */
+const NON_TEXT_INPUT_TYPES = ['button', 'submit', 'reset', 'checkbox', 'radio', 'file', 'image'];
+export const preventEnterSubmit = (e) => {
+  const target = e.target;
+  if (e.key === 'Enter' && target?.tagName === 'INPUT' && !NON_TEXT_INPUT_TYPES.includes(target.type)) {
+    e.preventDefault();
+  }
+};
+
 export const encodeString = (val, encoder = null) => {
   const encodedWith = encoder || ENCODER;
   const ciphertext = CryptoJS.AES.encrypt(val, encodedWith).toString();

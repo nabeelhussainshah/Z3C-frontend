@@ -9,7 +9,7 @@ import { CustomerProfileCreateRequest, CustomerProfileDetailRequest, CustomerPro
 
 // Utils
 import { Footer } from '../../../components';
-import { showToast, validateSubmissionData, decodeString, parseLoginInfo, getNormalizedModulePermissions } from '../../../utils';
+import { showToast, preventEnterSubmit, validateSubmissionData, decodeString, parseLoginInfo, getNormalizedModulePermissions } from '../../../utils';
 import { auth, loginInfo } from '../../../atoms';
 
 const INITIAL_FORM_DATA = {
@@ -468,7 +468,7 @@ function CustomerProfileForm() {
 
   const CUSTOMER_PROFILE_FORM = () => (
     <div className="breeze-form-card">
-      <form className="breeze-form" onSubmit={handleSubmitForm} noValidate>
+      <form className="breeze-form" onSubmit={handleSubmitForm} onKeyDown={preventEnterSubmit} noValidate>
         {PROFILE_DETAILS_SECTION()}
         {BANK_DETAILS_SECTION()}
         {FORM_ACTIONS()}

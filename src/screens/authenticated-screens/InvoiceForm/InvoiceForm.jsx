@@ -1,5 +1,5 @@
 // Packages
-import { Fragment, useState, useMemo, Suspense, use, useEffect, useCallback } from 'react';
+import { Fragment, useState, useMemo, Suspense, use, useEffect, useCallback, useRef } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useNavigate, useParams } from 'react-router-dom';
 import AsyncSelect from 'react-select/async';
@@ -10,7 +10,7 @@ import { InvoiceCreateRequest, InvoiceDetailRequest, InvoiceUpdateRequest, Invoi
 
 // Utils
 import { Footer, ErrorFallback, ZatcaXmlViewer } from '../../../components';
-import { showToast, validateSubmissionData, decodeString, INVOICE_STATUSES, parseLoginInfo, getNormalizedModulePermissions, OUT_OF_SCOPE_CODE, isVatZero, groupExemptionCodes, matchExemptionCodeByText, nextExemptionReason, validateLineExemptions } from '../../../utils';
+import { showToast, preventEnterSubmit, validateSubmissionData, decodeString, INVOICE_STATUSES, parseLoginInfo, getNormalizedModulePermissions, OUT_OF_SCOPE_CODE, isVatZero, groupExemptionCodes, matchExemptionCodeByText, nextExemptionReason, validateLineExemptions } from '../../../utils';
 import { auth, loginInfo } from '../../../atoms';
 
 const INITIAL_FORM_DATA = {
@@ -143,7 +143,9 @@ function InvoiceForm() {
             </div>
           </div>
         }>
+          {/* Keyed by invoice: a new invoice and each saved one get a fresh form. */}
           <InvoiceFormContent
+            key={id ?? 'new'}
             id={id}
             invoicePromise={invoicePromise}
             decodedToken={decodedToken}
@@ -632,7 +634,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
       if (id) {
         await InvoiceUpdateRequest(decodedToken, id, JSON.stringify(payloadData));
       } else {
-        await InvoiceCreateRequest(decodedToken, JSON.stringify(payloadData));
+        await handleCreateInvoice();
       }
 
       showToast(id ? 'Invoice updated successfully!' : 'Invoice created successfully!', 'success');
@@ -646,7 +648,12 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
       setIsSubmitting(false);
     }
   };
+  // A form creates at most one invoice. The router keeps this screen up while it
+  // moves on to the saved invoice, so a second click there must reuse it.
+  const createdInvoiceIdRef = useRef(null);
+
   const handleCreateInvoice = async () => {
+    if (createdInvoiceIdRef.current) return createdInvoiceIdRef.current;
     const payloadData = setSubmitPayload(true);
     const response = await InvoiceCreateRequest(decodedToken, JSON.stringify(payloadData));
     const createdInvoiceId =
@@ -658,6 +665,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
       throw new Error('Invoice created but ID was not returned from server');
     }
 
+    createdInvoiceIdRef.current = createdInvoiceId;
     return createdInvoiceId;
   };
 
@@ -818,9 +826,10 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
       return;
     }
 
+    let createdInvoiceId = null;
     try {
       setIsSubmitting(true);
-      const createdInvoiceId = await handleCreateInvoice();
+      createdInvoiceId = await handleCreateInvoice();
       const pdfBlob = await InvoicePdfDownloadRequest(decodedToken, createdInvoiceId);
       const fileURL = window.URL.createObjectURL(pdfBlob);
       const pdfWindow = window.open(fileURL, '_blank');
@@ -839,6 +848,8 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
     } finally {
       setIsSubmitting(false);
     }
+    // The invoice now exists: continue on it, so a second click cannot create it again.
+    if (createdInvoiceId) navigate(`/invoices/${createdInvoiceId}`, { replace: true });
   };
 
   const handlePrintProformaInvoice = async () => {
@@ -916,9 +927,10 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
       return;
     }
 
+    let createdInvoiceId = null;
     try {
       setIsSubmitting(true);
-      const createdInvoiceId = await handleCreateInvoice();
+      createdInvoiceId = await handleCreateInvoice();
       const pdfBlob = await InvoiceProformaPdfDownloadRequest(decodedToken, createdInvoiceId);
       const fileURL = window.URL.createObjectURL(pdfBlob);
       const pdfWindow = window.open(fileURL, '_blank');
@@ -937,6 +949,8 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
     } finally {
       setIsSubmitting(false);
     }
+    // The invoice now exists: continue on it, so a second click cannot create it again.
+    if (createdInvoiceId) navigate(`/invoices/${createdInvoiceId}`, { replace: true });
   };
 
   const handleUpdateAndCheckCompliance = async () => {
@@ -976,9 +990,10 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
       return;
     }
 
+    let createdInvoiceId = null;
     try {
       setIsSubmitting(true);
-      const createdInvoiceId = await handleCreateInvoice();
+      createdInvoiceId = await handleCreateInvoice();
       await InvoiceCheckComplianceRequest(decodedToken, createdInvoiceId);
       showToast('Invoice created and compliance check queued successfully!', 'success');
     } catch (error) {
@@ -989,6 +1004,8 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
     } finally {
       setIsSubmitting(false);
     }
+    // The invoice now exists: leave the new-invoice form (as Save does), so it cannot be created twice.
+    if (createdInvoiceId) navigate('/invoices');
   };
 
   // const handleCreateAndSubmitToZatca = async () => {
@@ -1447,6 +1464,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
         {TEXT_FIELD({
           label: 'Payment Terms',
           name: 'paymentTerms',
+          required: true,
           placeholder: 'e.g. Net 30',
         })}
         {TEXT_FIELD({
@@ -1716,7 +1734,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
                     <td data-label="Qty">
                       <input
                         aria-label={`Quantity, line ${index + 1}`}
-                        className={`breeze-line-items__input [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none${quantityErrorLines.includes(index) ? ' breeze-form-input--invalid' : ''}`}
+                        className={`breeze-line-items__input min-w-[5.5rem] [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none${quantityErrorLines.includes(index) ? ' breeze-form-input--invalid' : ''}`}
                         type="number"
                         min="1"
                         max={MAX_LINE_QUANTITY}
@@ -2024,6 +2042,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           }
           handleSubmitForm(e);
         }}
+        onKeyDown={preventEnterSubmit}
         noValidate
       >
         {invoiceData?.isError && (
