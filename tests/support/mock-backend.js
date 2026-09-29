@@ -51,10 +51,10 @@ export async function mockBackend(page, { user = ADMIN_USER, routes = [] } = {})
 /** Signs in through the real sign-in screen. */
 export async function signIn(page) {
   await page.goto('/login');
-  await page.getByPlaceholder('Enter email').fill('tester@example.com');
-  await page.getByPlaceholder('Enter password').fill('secret');
+  await page.getByPlaceholder('name@company.com').fill('tester@example.com');
+  await page.getByPlaceholder('Enter your password').fill('secret');
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByPlaceholder('Enter email')).toHaveCount(0);
+  await expect(page.getByPlaceholder('name@company.com')).toHaveCount(0);
 }
 
 /** API calls matching a method + path suffix. */

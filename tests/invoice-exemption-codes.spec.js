@@ -44,9 +44,9 @@ async function newInvoice(page, { customer = 'Acme Corp', lines = 1 } = {}) {
   await page.keyboard.type(customer.split(' ')[0]);
   await page.getByText(customer, { exact: true }).click();
   for (let i = 0; i < lines; i++) {
-    await page.getByRole('button', { name: '+ Add Item' }).click();
+    if (i > 0) await page.getByRole('button', { name: 'Add item' }).click();
     await page.getByPlaceholder('Description of product...').nth(i).fill(`Item ${i + 1}`);
-    await page.getByPlaceholder('Product Code').nth(i).fill(`P-${i + 1}`);
+    await page.getByPlaceholder('SKU').nth(i).fill(`P-${i + 1}`);
     await row(page, i).locator('input[type="number"]').nth(1).fill('100');
   }
 }
@@ -57,8 +57,9 @@ const codeSelect = (page, i) => page.getByLabel(`Exemption code, line ${i + 1}`)
 const reasonInput = (page, i) => page.getByLabel(`Exemption reason, line ${i + 1}`);
 
 async function choose(page, label) {
-  await page.getByText('Actions', { exact: true }).click({ force: true });
-  await page.getByText(label, { exact: true }).click();
+  // theme: the Actions dropdown became buttons; Create/Update is the Save (submit) button
+  const theme = { Create: 'Save', Update: 'Save' }[label] ?? label;
+  await page.getByRole('button', { name: theme, exact: true }).click();
 }
 
 test.describe('VAT exemption codes on invoice lines', () => {

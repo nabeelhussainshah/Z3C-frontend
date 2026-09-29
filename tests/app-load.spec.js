@@ -5,6 +5,6 @@ test('loads the sign-in screen', async ({ page }) => {
 
   await expect(page).toHaveTitle(/ZATCA Compliance Dashboard/i);
   await expect(page.getByRole('heading', { name: 'Sign in' }).first()).toBeVisible();
-  await expect(page.getByPlaceholder('Enter email')).toBeVisible();
-  await expect(page.getByPlaceholder('Enter password')).toBeVisible();
+  await expect(page.getByPlaceholder('name@company.com')).toBeVisible();
+  await expect(page.getByPlaceholder('Enter your password')).toBeVisible();
 });

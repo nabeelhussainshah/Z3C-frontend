@@ -158,7 +158,7 @@ async function openViewerFromList(page, { view = xmlView(), rows = [LIST_ROW] } 
   });
   await signIn(page);
   await page.goto('/invoices');
-  await page.getByRole('row', { name: /INV-2026-000018/ }).getByRole('combobox').selectOption('view-xml');
+  await page.getByRole('row', { name: /INV-2026-000018/ }).getByRole('button', { name: 'View ZATCA XML' }).click();
   await expect(page.getByRole('dialog', { name: /ZATCA XML/ })).toBeVisible();
   return calls;
 }
@@ -177,8 +177,7 @@ test.describe('ZATCA XML viewer', () => {
     const xmlCalls = calls.filter((c) => c.path.endsWith('/xml'));
     expect(xmlCalls.length).toBeGreaterThan(0);
     expect(xmlCalls.every((c) => c.path.endsWith('/invoices/inv-18/xml'))).toBe(true);
-    const draftOptions = await page.getByRole('row', { name: /INV-2026-000019/ }).getByRole('combobox').locator('option').allTextContents();
-    expect(draftOptions).not.toContain('View ZATCA XML');
+    await expect(page.getByRole('row', { name: /INV-2026-000019/ }).getByRole('button', { name: 'View ZATCA XML' })).toHaveCount(0);
   });
 
   test('shows one tab per stored XML, opening on the ZATCA-cleared one', async ({ page }) => {
@@ -345,8 +344,7 @@ test.describe('ZATCA XML viewer', () => {
     await page.goto('/invoices/inv-18');
     await expect(page.getByPlaceholder('Description of product...')).toHaveValue('Cloud hosting');
 
-    await page.getByText('Actions', { exact: true }).click({ force: true });
-    await page.getByText('View ZATCA XML', { exact: true }).click();
+    await page.getByRole('button', { name: 'View ZATCA XML', exact: true }).click();
     await expect(dialog(page)).toContainText('ZATCA XML — INV-2026-000018');
     expect(callsTo(calls, 'GET', '/invoices/inv-18/xml').length).toBeGreaterThan(0);
   });

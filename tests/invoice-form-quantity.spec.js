@@ -42,10 +42,10 @@ const qty = (page, i = 0) => page.getByLabel(`Quantity, line ${i + 1}`);
 const price = (page, i = 0) => row(page, i).locator('input[type="number"]').nth(1);
 const discount = (page, i = 0) => row(page, i).locator('input[type="number"]').nth(2);
 const discountPct = (page, i = 0) => row(page, i).locator('input[type="number"]').nth(3);
-const lineTotal = (page, i = 0) => row(page, i).locator('td.text-right.font-bold');
+const lineTotal = (page, i = 0) => row(page, i).locator('td.breeze-line-items__total');
 const summary = (page) =>
   page.evaluate(() =>
-    [...document.querySelectorAll('span')]
+    [...document.querySelectorAll('p.breeze-invoice-totals__label')]
       .filter((s) => /^(Subtotal|VAT \(|Grand Total)/.test(s.textContent))
       .map((s) => s.nextElementSibling?.textContent)
   );
@@ -58,15 +58,16 @@ async function newInvoice(page, lines = 1) {
   await page.keyboard.type('Acme');
   await page.getByText('Acme Corp', { exact: true }).click();
   for (let i = 0; i < lines; i++) {
-    await page.getByRole('button', { name: '+ Add Item' }).click();
+    if (i > 0) await page.getByRole('button', { name: 'Add item' }).click();
     await page.getByPlaceholder('Description of product...').nth(i).fill(`Item ${i + 1}`);
-    await page.getByPlaceholder('Product Code').nth(i).fill(`P-${i + 1}`);
+    await page.getByPlaceholder('SKU').nth(i).fill(`P-${i + 1}`);
   }
 }
 
 async function choose(page, label) {
-  await page.getByText('Actions', { exact: true }).click({ force: true });
-  await page.getByText(label, { exact: true }).click();
+  // theme: the Actions dropdown became buttons; Create/Update is the Save (submit) button
+  const theme = { Create: 'Save', Update: 'Save' }[label] ?? label;
+  await page.getByRole('button', { name: theme, exact: true }).click();
 }
 
 test.describe('Line quantity on the invoice form', () => {
@@ -167,7 +168,7 @@ test.describe('Line quantity on the invoice form', () => {
     await qty(page, 1).fill('1000001');
     await choose(page, 'Create');
     await expect(page.getByText('Quantity must be a whole number from 1 to 1,000,000 (lines 1, 2).').first()).toBeVisible();
-    await expect(qty(page, 0)).toHaveClass(/border-tomato/);
+    await expect(qty(page, 0)).toHaveClass(/breeze-form-input--invalid/);
 
     await qty(page, 0).fill('');
     await qty(page, 1).fill('2');
@@ -214,7 +215,7 @@ test('a credit note copies the original quantities', async ({ page }) => {
   });
   await signIn(page);
   await page.goto('/invoices');
-  await page.getByRole('row', { name: /INV-2026-000051/ }).getByRole('combobox').selectOption('credit-note');
+  await page.getByRole('row', { name: /INV-2026-000051/ }).getByRole('button', { name: 'Create credit note' }).click();
 
   await expect.poll(() => callsTo(calls, 'POST', '/invoices/inv-cleared/credit-note').length).toBe(1);
   expect(callsTo(calls, 'POST', '/invoices/inv-cleared/credit-note')[0].body.lineItems[0]).toMatchObject({

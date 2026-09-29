@@ -66,17 +66,18 @@ async function fillValidInvoice(page, { price = '100' } = {}) {
   await page.keyboard.type('Acme');
   await page.getByText('Acme Corp', { exact: true }).click();
 
-  await page.getByRole('button', { name: '+ Add Item' }).click();
+  // theme: a new invoice already has one blank line
   const row = page.getByPlaceholder('Description of product...').locator('xpath=ancestor::tr');
   await page.getByPlaceholder('Description of product...').fill('Consulting services');
-  await page.getByPlaceholder('Product Code').fill('C-1');
+  await page.getByPlaceholder('SKU').fill('C-1');
   // number inputs in a row: [0] qty, [1] price, [2] discount per unit, [3] discount %
   await row.locator('input[type="number"]').nth(1).fill(price);
 }
 
 async function chooseAction(page, label) {
-  await page.getByText('Actions', { exact: true }).click({ force: true }); // react-select placeholder
-  await page.getByText(label, { exact: true }).click();
+  // theme: the Actions dropdown became buttons; Create/Update is the Save (submit) button
+  const theme = { Create: 'Save', Update: 'Save' }[label] ?? label;
+  await page.getByRole('button', { name: theme, exact: true }).click();
 }
 
 const rateField = (page) => page.getByLabel(/Exchange Rate \(SAR per 1/);
