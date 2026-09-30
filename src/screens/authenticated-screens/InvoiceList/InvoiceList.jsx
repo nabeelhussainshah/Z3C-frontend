@@ -767,13 +767,6 @@ function InvoicesTableContent({
           return (
             <div className="breeze-table-actions">
               <ActionButton
-                tooltip="View"
-                label="View invoice"
-                icon="visibility"
-                disabled={isBusy}
-                onClick={() => navigate(`/invoices/${row.original._id}`)}
-              />
-              <ActionButton
                 tooltip="Print"
                 label="Print invoice"
                 icon="print"
