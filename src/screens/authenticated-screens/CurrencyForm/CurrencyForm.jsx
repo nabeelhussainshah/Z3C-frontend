@@ -9,16 +9,12 @@ import { CurrencyCreateRequest, CurrencyListRequest, CurrencyUpdateRequest } fro
 // Utils
 import { auth } from '../../../atoms';
 import { Footer } from '../../../components';
-import { decodeString, showToast } from '../../../utils';
+import { decodeString, preventEnterSubmit, showToast } from '../../../utils';
 
 const INITIAL_FORM = { code: '', name: '', symbol: '', isActive: true, isBase: false };
 
 // Only 2-decimal currencies are supported (amounts are integer 1/100 units).
 const DECIMAL_PLACES = 2;
-
-const INPUT_CLASS =
-  'px-4 py-2.5 rounded-lg border border-[#e7ebf3] bg-white text-sm text-[#0d121b] focus:ring-2 focus:ring-primary focus:border-primary transition-colors dark:bg-[#161f30] dark:border-[#2a3447] dark:text-white';
-const LABEL_CLASS = 'text-xs font-bold text-[#4c669a] dark:text-gray-400';
 
 /** Create (/currencies/new) or edit (/currencies/:code) a currency. */
 function CurrencyForm() {
@@ -108,118 +104,223 @@ function CurrencyForm() {
       .finally(() => _isSubmitting(false));
   };
 
+  const goToList = () => navigate('/currencies');
+
+  const inputClassName = (name, extra = '') =>
+    `breeze-form-input${errors[name] ? ' breeze-form-input--invalid' : ''}${extra ? ` ${extra}` : ''}`;
+
   // *********** Render Functions ***********
 
-  const FIELDS = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="flex flex-col gap-2">
-        <label htmlFor="currency-code" className={LABEL_CLASS}>Code *</label>
-        <input
-          id="currency-code"
-          name="code"
-          type="text"
-          maxLength={3}
-          value={form.code}
-          onChange={handleChange}
-          disabled={isEdit}
-          placeholder="e.g. AED"
-          className={`${INPUT_CLASS} uppercase ${isEdit ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-        />
-        {errors.code && <span className="text-xs text-tomato">{errors.code}</span>}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label htmlFor="currency-name" className={LABEL_CLASS}>Name *</label>
-        <input
-          id="currency-name"
-          name="name"
-          type="text"
-          value={form.name}
-          onChange={handleChange}
-          placeholder="e.g. UAE Dirham"
-          className={INPUT_CLASS}
-        />
-        {errors.name && <span className="text-xs text-tomato">{errors.name}</span>}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label htmlFor="currency-symbol" className={LABEL_CLASS}>Symbol</label>
-        <input
-          id="currency-symbol"
-          name="symbol"
-          type="text"
-          value={form.symbol}
-          onChange={handleChange}
-          placeholder="e.g. AED"
-          className={INPUT_CLASS}
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label htmlFor="currency-decimals" className={LABEL_CLASS}>Decimal places</label>
-        <input
-          id="currency-decimals"
-          type="number"
-          value={DECIMAL_PLACES}
-          disabled
-          className={`${INPUT_CLASS} bg-gray-50 cursor-not-allowed`}
-        />
-        <span className="text-xs text-[#4c669a]">Only 2-decimal currencies are supported.</span>
-      </div>
-
-      {isEdit && (
-        <label className="flex items-center gap-2 text-sm text-[#0d121b] dark:text-white">
-          <input
-            name="isActive"
-            type="checkbox"
-            checked={form.isActive}
-            onChange={handleChange}
-            disabled={form.isBase}
-            className="rounded border-[#e7ebf3] text-primary focus:ring-primary"
-          />
-          Active (selectable on new invoices)
-          {form.isBase && <span className="text-xs text-[#4c669a]">— the base currency is always active</span>}
-        </label>
-      )}
+  const FIELD = ({ label, name, htmlFor, required, hint, children }) => (
+    <div className="breeze-form-field">
+      <label className="breeze-field__label" htmlFor={htmlFor}>
+        {label}
+        {required ? <span className="breeze-form-required"> *</span> : null}
+      </label>
+      {children}
+      {hint && !errors[name] ? <p className="breeze-form-hint">{hint}</p> : null}
+      {errors[name] ? (
+        <span className="breeze-field__error" id={`${htmlFor}-error`}>
+          {errors[name]}
+        </span>
+      ) : null}
     </div>
   );
 
+  const SECTION_HEADER = ({ icon, title, lede }) => (
+    <div className="breeze-form-section__header">
+      <span className="breeze-form-section__badge" aria-hidden="true">
+        <span className="material-symbols-outlined">{icon}</span>
+      </span>
+      <div>
+        <h3 className="breeze-form-section__title">{title}</h3>
+        {lede ? <p className="breeze-form-section__lede">{lede}</p> : null}
+      </div>
+    </div>
+  );
+
+  const PAGE_HEADER = () => (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <button
+          type="button"
+          onClick={goToList}
+          className="breeze-link breeze-page__back"
+        >
+          <span className="material-symbols-outlined">arrow_back</span>
+          Currencies
+        </button>
+        <h2 className="breeze-page__title">
+          {isEdit ? `Edit ${form.code || 'Currency'}` : 'Add Currency'}
+        </h2>
+        <p className="breeze-page__lede">
+          Enter amounts in this currency on invoices; they are converted to SAR for ZATCA.
+        </p>
+      </div>
+    </div>
+  );
+
+  const CURRENCY_DETAILS_SECTION = () => (
+    <section className="breeze-form-section">
+      {SECTION_HEADER({
+        icon: 'payments',
+        title: 'Currency details',
+        lede: 'ISO code, display name, and symbol used when entering invoice amounts.',
+      })}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
+        {FIELD({
+          label: 'Code',
+          name: 'code',
+          htmlFor: 'currency-code',
+          required: true,
+          children: (
+            <input
+              id="currency-code"
+              name="code"
+              type="text"
+              maxLength={3}
+              value={form.code}
+              onChange={handleChange}
+              disabled={isEdit}
+              placeholder="e.g. AED"
+              aria-invalid={Boolean(errors.code)}
+              aria-describedby={errors.code ? 'currency-code-error' : undefined}
+              className={inputClassName('code', `uppercase${isEdit ? ' breeze-form-input--locked' : ''}`)}
+            />
+          ),
+        })}
+        {FIELD({
+          label: 'Name',
+          name: 'name',
+          htmlFor: 'currency-name',
+          required: true,
+          children: (
+            <input
+              id="currency-name"
+              name="name"
+              type="text"
+              value={form.name}
+              onChange={handleChange}
+              placeholder="e.g. UAE Dirham"
+              aria-invalid={Boolean(errors.name)}
+              aria-describedby={errors.name ? 'currency-name-error' : undefined}
+              className={inputClassName('name')}
+            />
+          ),
+        })}
+        {FIELD({
+          label: 'Symbol',
+          name: 'symbol',
+          htmlFor: 'currency-symbol',
+          children: (
+            <input
+              id="currency-symbol"
+              name="symbol"
+              type="text"
+              value={form.symbol}
+              onChange={handleChange}
+              placeholder="e.g. AED"
+              className={inputClassName('symbol')}
+            />
+          ),
+        })}
+        {FIELD({
+          label: 'Decimal places',
+          name: 'decimals',
+          htmlFor: 'currency-decimals',
+          hint: 'Only 2-decimal currencies are supported.',
+          children: (
+            <input
+              id="currency-decimals"
+              type="number"
+              value={DECIMAL_PLACES}
+              disabled
+              className="breeze-form-input breeze-form-input--locked"
+            />
+          ),
+        })}
+        {isEdit && (
+          <div className="breeze-form-field sm:col-span-2">
+            <label className={`breeze-check w-fit ${form.isBase ? 'pointer-events-none' : ''}`}>
+              <input
+                name="isActive"
+                type="checkbox"
+                checked={form.isActive}
+                onChange={handleChange}
+                disabled={form.isBase}
+                className="breeze-check__box"
+              />
+              Active (selectable on new invoices)
+            </label>
+            {form.isBase ? (
+              <p className="breeze-form-hint">The base currency is always active.</p>
+            ) : null}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+
+  const FORM_ACTIONS = () => (
+    <div className="breeze-form-actions">
+      <button
+        type="button"
+        onClick={goToList}
+        className="breeze-btn breeze-btn--outline breeze-btn--inline w-full sm:w-auto"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        disabled={isSubmitting || isLoading}
+        className="breeze-btn breeze-btn--primary breeze-btn--inline w-full sm:w-auto min-w-[140px]"
+      >
+        {isSubmitting ? (
+          <Fragment>
+            <span className="breeze-btn__spinner" aria-hidden="true" />
+            Saving...
+          </Fragment>
+        ) : (
+          <Fragment>
+            <span className="material-symbols-outlined text-[18px]">save</span>
+            {isEdit ? 'Save Changes' : 'Add Currency'}
+          </Fragment>
+        )}
+      </button>
+    </div>
+  );
+
+  const LOADING_CARD = () => (
+    <div className="breeze-form-card px-6 py-10">
+      <div className="flex items-center justify-center gap-2 text-[var(--z3c-subtle)]">
+        <span className="material-symbols-outlined animate-spin">sync</span>
+        Loading currency...
+      </div>
+    </div>
+  );
+
+  const CURRENCY_FORM = () => (
+    <div className="breeze-form-card">
+      <form className="breeze-form" onSubmit={handleSubmit} onKeyDown={preventEnterSubmit} noValidate>
+        {CURRENCY_DETAILS_SECTION()}
+        {FORM_ACTIONS()}
+      </form>
+    </div>
+  );
+
+  const CONTENT = () => (
+    <Fragment>
+      <div className="breeze-page flex-1">
+        {PAGE_HEADER()}
+        {isEdit && isLoading ? LOADING_CARD() : CURRENCY_FORM()}
+      </div>
+      <Footer />
+    </Fragment>
+  );
+
   return (
-    <div id="currency-form">
-      <Fragment>
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          <div className="space-y-1">
-            <h2 className="text-[#0d121b] dark:text-white text-3xl font-black tracking-tight">
-              {isEdit ? `Edit ${form.code || 'Currency'}` : 'Add Currency'}
-            </h2>
-            <p className="text-[#4c669a] text-base">
-              Enter amounts in this currency on invoices; they are converted to SAR for ZATCA.
-            </p>
-          </div>
-
-          <div className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447] shadow-sm p-6">
-            {isLoading ? <p className="text-sm text-[#4c669a]">Loading currency...</p> : FIELDS()}
-          </div>
-
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/currencies')}
-              className="px-4 py-2.5 rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] bg-white dark:bg-[#161f30] text-sm font-medium text-[#0d121b] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || isLoading}
-              className="px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shadow-md shadow-primary/20 disabled:opacity-50"
-            >
-              {isSubmitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Currency'}
-            </button>
-          </div>
-        </form>
-        <Footer />
-      </Fragment>
+    <div id="currency-form" className="flex min-h-0 flex-1 flex-col">
+      {CONTENT()}
     </div>
   );
 }

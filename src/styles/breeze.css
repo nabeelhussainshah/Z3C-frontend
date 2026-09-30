@@ -102,7 +102,6 @@
   --z3c-logo-h: 40px;
   --z3c-header-pad-t: 22px;
   --z3c-main-pad-t: 12px;
-  --z3c-hero-pad-t: 0px;
   --z3c-col-gap: 36px;
   --z3c-footer-pad-b: 28px;
   --z3c-control-h: 44px;
@@ -139,7 +138,6 @@
     --z3c-logo-h: 50px;
     --z3c-header-pad-t: 30px;
     --z3c-main-pad-t: 10px;
-    --z3c-hero-pad-t: 34px;
     --z3c-col-gap: 48px;
     --z3c-footer-pad-b: 38px;
   }
@@ -152,7 +150,6 @@
     --z3c-card-pad-x: 36px;
     --z3c-title-size: 36px;
     --z3c-title-lh: 42px;
-    --z3c-hero-pad-t: 40px;
     --z3c-col-gap: 56px;
   }
 }
@@ -170,7 +167,6 @@
     --z3c-logo-h: 52px;
     --z3c-header-pad-t: 34px;
     --z3c-main-pad-t: 10px;
-    --z3c-hero-pad-t: 48px;
     --z3c-col-gap: 64px;
     --z3c-footer-pad-b: 46px;
   }
@@ -804,13 +800,14 @@
   @media (min-width: 1024px) {
     .breeze-main {
       grid-template-columns: minmax(0, 1fr) var(--z3c-card-w);
+      /* Top-align the two columns, then center the pair in leftover height. */
+      align-items: start;
+      align-content: safe center;
       justify-items: stretch;
       padding-block: var(--z3c-main-pad-t) 0;
     }
 
     .breeze-hero {
-      align-self: start;
-      padding-top: var(--z3c-hero-pad-t);
       text-align: start;
     }
 
@@ -824,6 +821,145 @@
 
     .breeze-footer {
       text-align: start;
+    }
+  }
+
+  /* --------------------------------------------------- >= 1920px layout --- */
+
+  @media (min-width: 1920px) {
+    .breeze-auth {
+      font-size: 118.75%;
+      --z3c-card-w: 36%;
+      --z3c-card-pad-x: 7%;
+      --z3c-card-pad-t: 6%;
+      --z3c-card-pad-b: 6.5%;
+      --z3c-card-title-size: 190%;
+      --z3c-card-title-lh: 1.25;
+      --z3c-title-size: 240%;
+      --z3c-title-lh: 1.15;
+      --z3c-logo-h: 3.15em;
+      --z3c-header-pad-t: 1.8em;
+      --z3c-gutter: 6%;
+      --z3c-col-gap: 5%;
+      --z3c-footer-pad-b: 2.4em;
+      --z3c-control-h: 2.6em;
+      --z3c-submit-h: 2.75em;
+    }
+
+    .breeze-auth .breeze-shell {
+      max-width: none;
+    }
+
+    .breeze-auth .breeze-card {
+      width: 100%;
+    }
+
+    .breeze-auth .breeze-hero {
+      max-width: 100%;
+    }
+
+    .breeze-auth .breeze-hero__eyebrow {
+      font-size: 70%;
+      line-height: 1.35;
+    }
+
+    .breeze-auth .breeze-hero__lede {
+      max-width: 75%;
+      font-size: 90%;
+      line-height: 1.5;
+    }
+
+    .breeze-auth .breeze-features {
+      gap: 1.8em;
+      margin-top: 1.4em;
+    }
+
+    .breeze-auth .breeze-feature {
+      width: 4.2em;
+    }
+
+    .breeze-auth .breeze-feature__badge {
+      width: 2.9em;
+      height: 2.9em;
+    }
+
+    .breeze-auth .breeze-feature__badge .material-symbols-outlined {
+      font-size: 155%;
+    }
+
+    .breeze-auth .breeze-feature__label {
+      font-size: 70%;
+      line-height: 1.35;
+    }
+
+    .breeze-auth .breeze-card__subtitle {
+      font-size: 80%;
+      line-height: 1.45;
+    }
+
+    .breeze-auth .breeze-card__form {
+      margin-top: 6%;
+    }
+
+    .breeze-auth .breeze-card__footer {
+      font-size: 65%;
+    }
+
+    .breeze-auth .breeze-field__label {
+      font-size: 75%;
+    }
+
+    .breeze-auth .breeze-input {
+      font-size: 80%;
+    }
+
+    .breeze-auth .breeze-btn {
+      font-size: 85%;
+    }
+
+    .breeze-auth .breeze-btn--outline {
+      font-size: 75%;
+    }
+
+    .breeze-auth .breeze-check,
+    .breeze-auth .breeze-link,
+    .breeze-auth .breeze-divider {
+      font-size: 70%;
+    }
+
+    .breeze-auth .breeze-footer {
+      font-size: 65%;
+    }
+  }
+
+  @media (min-width: 2560px) {
+    .breeze-auth {
+      font-size: 131.25%;
+      --z3c-card-w: 28%;
+      --z3c-gutter: 5%;
+      --z3c-col-gap: 4%;
+    }
+  }
+
+  /* --------------------------------------------------- >= 3840px / 4K ------ */
+
+  @media (min-width: 3840px) {
+    .breeze-auth {
+      font-size: 162.5%;
+      --z3c-card-w: 22%;
+      --z3c-card-pad-x: 6%;
+      --z3c-card-pad-t: 5.5%;
+      --z3c-card-pad-b: 6%;
+      --z3c-logo-h: 3.4em;
+      --z3c-header-pad-t: 2em;
+      --z3c-gutter: 4.5%;
+      --z3c-col-gap: 3.5%;
+      --z3c-control-h: 2.7em;
+      --z3c-submit-h: 2.85em;
+    }
+
+    .breeze-auth .breeze-hero__lede {
+      max-width: 72%;
     }
   }
 

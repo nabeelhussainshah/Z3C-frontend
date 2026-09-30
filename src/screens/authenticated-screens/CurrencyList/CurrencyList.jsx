@@ -81,113 +81,144 @@ function CurrencyList() {
       .finally(() => _isUpdating(false));
   };
 
+  const handleRowClick = (currency, event) => {
+    if (!perms.update || !currency?.code) return;
+    if (event.target.closest('button')) return;
+    navigate(`/currencies/${currency.code}`);
+  };
+
   // *********** Render Functions ***********
 
   const PAGE_HEADER = () => (
-    <div className="flex flex-wrap justify-between items-end gap-4">
-      <div className="space-y-1">
-        <h2 className="text-[#0d121b] dark:text-white text-3xl font-black tracking-tight">Currencies</h2>
-        <p className="text-[#4c669a] text-base">
-          Currencies available on invoices. Invoices are always reported to ZATCA in SAR.
-        </p>
-      </div>
-      {perms.create && (
-        <button
-          onClick={() => navigate('/currencies/new')}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shadow-md shadow-primary/20 w-full sm:w-auto"
-        >
-          <span className="material-symbols-outlined text-[20px]">add</span>
-          Add Currency
-        </button>
-      )}
+    <div>
+      <h2 className="breeze-page__title">Currencies</h2>
+      <p className="breeze-page__lede">
+        Currencies available on invoices. Invoices are always reported to ZATCA in SAR.
+      </p>
     </div>
   );
 
-  const STATUS_BADGE = (currency) =>
-    currency.isActive ? (
-      <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-        Active
-      </span>
-    ) : (
-      <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-        Inactive
+  const ACTIONS_SECTION = () =>
+    perms.create ? (
+      <div className="breeze-toolbar">
+        <div className="flex flex-col sm:flex-row gap-3 sm:ms-auto">
+          <button
+            type="button"
+            onClick={() => navigate('/currencies/new')}
+            className="breeze-btn breeze-btn--primary breeze-btn--inline w-full sm:w-auto"
+          >
+            <span className="material-symbols-outlined text-[20px]">add</span>
+            Add Currency
+          </button>
+        </div>
+      </div>
+    ) : null;
+
+  const STATUS_BADGE = (currency) => {
+    const isActive = currency.isActive;
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${isActive
+        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
+        : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
+        }`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-green-600 dark:bg-green-400' : 'bg-red-600 dark:bg-red-400'
+          }`}></span>
+        {isActive ? 'Active' : 'Inactive'}
       </span>
     );
+  };
 
   const ROW_ACTIONS = (currency) => (
-    <div className="flex items-center justify-end gap-3">
+    <div className="breeze-table-actions">
       {perms.update && (
-        <button
-          onClick={() => navigate(`/currencies/${currency.code}`)}
-          className="text-primary text-sm font-bold hover:underline"
-        >
-          Edit
-        </button>
+        <span className="breeze-table-action-wrap breeze-table-action-wrap--tooltip-end" data-tooltip="Edit">
+          <button
+            type="button"
+            onClick={() => navigate(`/currencies/${currency.code}`)}
+            className="breeze-table-action"
+            aria-label="Edit"
+          >
+            <span className="material-symbols-outlined">edit</span>
+          </button>
+        </span>
       )}
       {!currency.isBase && currency.isActive && perms.delete && (
-        <button
-          onClick={() => _pendingDeactivate(currency)}
-          disabled={isUpdating}
-          className="text-tomato text-sm font-bold hover:underline disabled:opacity-50"
-        >
-          Deactivate
-        </button>
+        <span className="breeze-table-action-wrap breeze-table-action-wrap--tooltip-end" data-tooltip="Deactivate">
+          <button
+            type="button"
+            onClick={() => _pendingDeactivate(currency)}
+            disabled={isUpdating}
+            className="breeze-table-action"
+            aria-label="Deactivate"
+          >
+            <span className="material-symbols-outlined">block</span>
+          </button>
+        </span>
       )}
       {!currency.isActive && perms.update && (
-        <button
-          onClick={() => handleActivate(currency)}
-          disabled={isUpdating}
-          className="text-primary text-sm font-bold hover:underline disabled:opacity-50"
-        >
-          Activate
-        </button>
+        <span className="breeze-table-action-wrap breeze-table-action-wrap--tooltip-end" data-tooltip="Activate">
+          <button
+            type="button"
+            onClick={() => handleActivate(currency)}
+            disabled={isUpdating}
+            className={`breeze-table-action${isUpdating ? ' is-busy' : ''}`}
+            aria-label="Activate"
+          >
+            <span className="material-symbols-outlined">check_circle</span>
+          </button>
+        </span>
       )}
     </div>
   );
 
   const CURRENCIES_TABLE = () => (
-    <div className="bg-white dark:bg-[#161f30] rounded-xl border border-[#e7ebf3] dark:border-[#2a3447] shadow-sm overflow-hidden">
+    <div className="breeze-table-card">
       <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead className="bg-[#f8f9fc] dark:bg-[#1a253a] text-[#4c669a] dark:text-gray-400 text-xs font-bold uppercase tracking-wider">
+        <table>
+          <thead>
             <tr>
-              <th className="px-6 py-4">Code</th>
-              <th className="px-6 py-4">Name</th>
-              <th className="px-6 py-4">Symbol</th>
-              <th className="px-6 py-4">Decimals</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4 text-right">Actions</th>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Symbol</th>
+              <th>Decimals</th>
+              <th>Status</th>
+              <th className="text-center">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#e7ebf3] dark:divide-[#2a3447]">
+          <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-sm text-[#4c669a]">
-                  Loading currencies...
+                <td colSpan={6} className="!text-center text-[var(--z3c-subtle)]">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined animate-spin">sync</span>
+                    Loading currencies...
+                  </div>
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-sm text-[#4c669a]">
+                <td colSpan={6} className="!text-center text-[var(--z3c-subtle)]">
                   No currencies found
                 </td>
               </tr>
             ) : (
               rows.map((currency) => (
-                <tr key={currency.code} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-bold text-[#0d121b] dark:text-white">
-                    {currency.code}
+                <tr
+                  key={currency.code}
+                  onClick={(event) => handleRowClick(currency, event)}
+                  className={perms.update ? 'cursor-pointer' : ''}
+                >
+                  <td>
+                    <span className="font-medium">{currency.code}</span>
                     {currency.isBase && (
-                      <span className="ml-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-primary/10 text-primary">
-                        Base
-                      </span>
+                      <span className="breeze-pill breeze-pill--primary ml-2">Base</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-[#0d121b] dark:text-white">{currency.name}</td>
-                  <td className="px-6 py-4 text-sm text-[#0d121b] dark:text-white">{currency.symbol || '—'}</td>
-                  <td className="px-6 py-4 text-sm text-[#0d121b] dark:text-white">{currency.decimalPlaces}</td>
-                  <td className="px-6 py-4 text-sm">{STATUS_BADGE(currency)}</td>
-                  <td className="px-6 py-4 text-sm">{ROW_ACTIONS(currency)}</td>
+                  <td>{currency.name}</td>
+                  <td>{currency.symbol || '—'}</td>
+                  <td>{currency.decimalPlaces}</td>
+                  <td>{STATUS_BADGE(currency)}</td>
+                  <td>{ROW_ACTIONS(currency)}</td>
                 </tr>
               ))
             )}
@@ -197,15 +228,20 @@ function CurrencyList() {
     </div>
   );
 
+  const CONTENT = () => (
+    <Fragment>
+      <div className="breeze-page flex-1">
+        {PAGE_HEADER()}
+        {ACTIONS_SECTION()}
+        {CURRENCIES_TABLE()}
+      </div>
+      <Footer />
+    </Fragment>
+  );
+
   return (
-    <div id="currency-list">
-      <Fragment>
-        <div className="p-8 space-y-6">
-          {PAGE_HEADER()}
-          {CURRENCIES_TABLE()}
-        </div>
-        <Footer />
-      </Fragment>
+    <div id="currency-list" className="flex min-h-0 flex-1 flex-col">
+      {CONTENT()}
       <ConfirmModal
         isOpen={!!pendingDeactivate}
         title="Deactivate currency"
