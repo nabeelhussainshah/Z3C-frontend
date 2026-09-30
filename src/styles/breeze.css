@@ -2656,12 +2656,13 @@
 
     .breeze-invoice-actions {
       flex-direction: row;
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
     }
 
     .breeze-invoice-actions .breeze-btn {
-      flex: 1 1 0;
+      flex: 1 0 auto;
       width: auto;
+      min-width: min-content;
     }
 
     .breeze-app-footer {
