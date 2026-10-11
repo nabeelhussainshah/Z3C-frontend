@@ -31,7 +31,7 @@ export const HTTP_ERROR_MESSAGES = {
 
 /**
  * Generic network error handler: shows an error toast and logs to console.
- * For HTTP 400, parses the response body and shows the server's "message" if present.
+ * For HTTP 400 and 409, parses the response body and shows the server's "message" if present.
  * For HTTP 401 with reason PERMISSIONS_UPDATED, dispatches a "permissions:updated" window
  * event so the permissions middleware can silently refresh the token and reload the page.
  * @param {Response|Error|unknown} errorOrResponse - Fetch Response (with status) or Error instance.
@@ -112,8 +112,9 @@ export const handleNetworkError = async (errorOrResponse, fallbackMessage = 'Som
       }
     }
 
-    // For 400, use server message from response body (e.g. validation errors)
-    if (status === 400 && typeof errorOrResponse.json === 'function') {
+    // For 400 and 409, use server message from response body (e.g. validation
+    // errors, or why an invoice cannot be sent to ZATCA right now)
+    if ((status === 400 || status === 409) && typeof errorOrResponse.json === 'function') {
       try {
         const data = await errorOrResponse.json();
         if (data?.message && typeof data.message === 'string') {
