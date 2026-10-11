@@ -46,7 +46,8 @@ function UserManagementList() {
       limit: pagination.pageSize,
       search: appliedSearchQuery || undefined,
       sortBy: sorting.length > 0 ? `${sorting[0].id}:${sorting[0].desc ? 'desc' : 'asc'}` : undefined,
-      isActive: filters.isActive !== '' ? filters.isActive === 'true' : undefined,
+      // "All" must be explicit: without isActive the API lists active users only.
+      isActive: filters.isActive !== '' ? filters.isActive === 'true' : 'all',
       role: filters.role || undefined,
     };
 
