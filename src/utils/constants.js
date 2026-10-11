@@ -102,6 +102,17 @@ export const INVOICE_STATUSES = [
     color: "bg-green-300"
   },
   {
+    // Simplified (B2C) invoices reported to ZATCA before they were marked REPORTED.
+    name: "ACCEPTED",
+    canEdit: false,
+    canDelete: false,
+    canCheckCompliance: false,
+    canSubmitToZatca: false,
+    canCreateCreditNote: true,
+    canCreateDebitNote: true,
+    color: "bg-green-300"
+  },
+  {
     name: "CLEARED",
     canEdit: false,
     canDelete: false,

@@ -17,6 +17,15 @@ const lines = (numbers) => `line${numbers.length > 1 ? 's' : ''} ${numbers.join(
 
 export const isVatZero = (vat) => vat !== '' && vat !== null && vat !== undefined && Number(vat) === 0;
 
+/** The only invoice VAT rates ZATCA accepts (BR-KSA-84 rejects any other). */
+export const ZATCA_VAT_RATES = [15, 5, 0];
+
+/** Error for a VAT rate ZATCA would reject; '' when allowed or empty (the required check covers empty). */
+export const vatRateError = (vat) => {
+  if (vat === '' || vat === null || vat === undefined) return '';
+  return ZATCA_VAT_RATES.includes(Number(vat)) ? '' : 'VAT must be 15%, 5% or 0% (ZATCA accepts no other rate)';
+};
+
 export const findExemptionCode = (codes, code) => (code ? codes.find((c) => c.code === code) : undefined);
 
 /** Lines saved before codes existed carry only reason text. */
