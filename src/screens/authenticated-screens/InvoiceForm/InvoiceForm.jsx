@@ -10,7 +10,7 @@ import { InvoiceCreateRequest, InvoiceDetailRequest, InvoiceUpdateRequest, Invoi
 
 // Utils
 import { Footer, ErrorFallback, ZatcaXmlViewer } from '../../../components';
-import { showToast, preventEnterSubmit, validateSubmissionData, decodeString, INVOICE_STATUSES, parseLoginInfo, getNormalizedModulePermissions, OUT_OF_SCOPE_CODE, isVatZero, groupExemptionCodes, matchExemptionCodeByText, nextExemptionReason, validateLineExemptions } from '../../../utils';
+import { showToast, preventEnterSubmit, validateSubmissionData, decodeString, INVOICE_STATUSES, parseLoginInfo, getNormalizedModulePermissions, OUT_OF_SCOPE_CODE, isVatZero, vatRateError, groupExemptionCodes, matchExemptionCodeByText, nextExemptionReason, validateLineExemptions } from '../../../utils';
 import { auth, loginInfo } from '../../../atoms';
 
 const INITIAL_FORM_DATA = {
@@ -540,6 +540,12 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
     const exchangeRateError = getExchangeRateError(formData.data);
     if (exchangeRateError) {
       validationErrors.exchangeRate = exchangeRateError;
+      isValid = false;
+    }
+
+    const vatError = !validationErrors.vat && vatRateError(formData.data.vat);
+    if (vatError) {
+      validationErrors.vat = vatError;
       isValid = false;
     }
 
