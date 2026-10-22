@@ -109,6 +109,7 @@ test.describe('Invoice form — multi-currency', () => {
 
     await page.getByLabel('Currency').selectOption('USD');
     await expect(page.getByLabel('Exchange Rate (SAR per 1 USD) *')).toBeVisible();
+    await expect(page.getByText(/Saudi Central Bank daily rate for the date VAT becomes due/)).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Price (USD)' })).toBeVisible();
     await expect(page.getByText('0.00 USD').first()).toBeVisible();
 
