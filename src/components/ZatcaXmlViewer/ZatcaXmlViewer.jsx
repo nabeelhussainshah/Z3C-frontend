@@ -9,7 +9,7 @@ import { InvoiceZatcaXmlRequest } from '../../requests';
 // Utils
 import { auth } from '../../atoms';
 import { decodeString, showToast } from '../../utils';
-import { parseXmlDocument, summarizeInvoiceXml, checkInvoiceXml, formatMinor } from './zatca-xml';
+import { parseXmlDocument, summarizeInvoiceXml, checkInvoiceXml, formatMinor, isForeignCurrencyXml } from './zatca-xml';
 import XmlTree, { XmlSource } from './XmlTree';
 
 const OUTCOMES = {
@@ -113,6 +113,7 @@ function Amounts({ summary }) {
     ['VAT', summary.taxTotal],
     ['Total with VAT', totals.taxInclusive],
     ['Payable', totals.payable],
+    ...(isForeignCurrencyXml(summary) ? [['VAT in SAR', summary.taxCurrencyTotal?.amount]] : []),
   ];
   const th = 'px-3 py-2 text-left text-[10px] font-bold uppercase text-[#4c669a] dark:text-gray-400';
   const td = 'px-3 py-2 text-sm text-[#0d121b] dark:text-white';
@@ -133,7 +134,7 @@ function Amounts({ summary }) {
         {summary.billingReference && <Field label="Billing reference" value={summary.billingReference} />}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+      <div className={`grid grid-cols-2 gap-3 ${cards.length > 6 ? 'md:grid-cols-7' : 'md:grid-cols-6'}`}>
         {cards.map(([label, value]) => (
           <div key={label} className="rounded-lg border border-[#e7ebf3] dark:border-[#2a3447] p-3" data-testid={`xml-total-${label}`}>
             <p className="text-[10px] font-bold uppercase text-[#4c669a] dark:text-gray-400">{label}</p>
@@ -322,8 +323,21 @@ function XmlPanel({ doc, fileName }) {
 function DocumentPanel({ doc, view }) {
   const parsed = useMemo(() => parseXmlDocument(doc.xml), [doc.xml]);
   const summary = useMemo(() => (parsed.doc ? summarizeInvoiceXml(parsed.doc) : null), [parsed.doc]);
-  const checks = useMemo(() => (summary ? checkInvoiceXml(summary, view.totals?.sar) : []), [summary, view.totals]);
+  const checks = useMemo(
+    () =>
+      summary
+        ? checkInvoiceXml(summary, {
+            invoiceCurrency: view.totals?.invoiceCurrency,
+            sar: view.totals?.sar,
+            currency: view.currency,
+            exchangeRate: view.exchangeRate,
+          })
+        : [],
+    [summary, view.totals, view.currency, view.exchangeRate]
+  );
   const isForeign = view.currency && view.currency !== 'SAR';
+  // Foreign invoices reported before multi-currency XML carry SAR throughout.
+  const reportedInSar = isForeign && summary && !isForeignCurrencyXml(summary);
   const invoiceCurrencyTotal = view.totals?.invoiceCurrency?.grandTotal;
 
   return (
@@ -351,11 +365,18 @@ function DocumentPanel({ doc, view }) {
       {isForeign && (
         <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900/50 dark:bg-blue-900/20 p-3 text-sm text-[#0d121b] dark:text-gray-200">
           <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-blue-600">currency_exchange</span>
-          <span>
-            This invoice was entered in {view.currency} at {view.exchangeRate} SAR per 1 {view.currency}
-            {invoiceCurrencyTotal != null && ` (total ${formatMinor(invoiceCurrencyTotal)} ${view.currency})`}. ZATCA only accepts
-            SAR, so every amount in this XML is in SAR.
-          </span>
+          {reportedInSar ? (
+            <span>
+              This invoice was entered in {view.currency} at {view.exchangeRate} SAR per 1 {view.currency}
+              {invoiceCurrencyTotal != null && ` (total ${formatMinor(invoiceCurrencyTotal)} ${view.currency})`} and was reported to ZATCA
+              in SAR, so every amount in this XML is in SAR.
+            </span>
+          ) : (
+            <span>
+              This invoice is in {view.currency}: every amount in this XML is in {view.currency}, and the VAT total is also given in SAR
+              at {view.exchangeRate} SAR per 1 {view.currency}, as ZATCA requires.
+            </span>
+          )}
         </div>
       )}
 

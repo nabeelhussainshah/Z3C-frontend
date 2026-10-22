@@ -1,9 +1,14 @@
 /**
  * Pure helpers for reading a ZATCA UBL invoice XML in the browser: parse it,
  * pull out the amounts that matter, and check that they add up (and match
- * the invoice's stored SAR totals and the QR code).
+ * the invoice's stored totals and the QR code).
  *
- * All money is handled as integer minor units (halala) to avoid float drift.
+ * The XML is in the invoice currency (DocumentCurrencyCode), with the VAT
+ * total repeated in SAR (the TaxTotal without a breakdown). Invoices reported
+ * before multi-currency XML carry SAR throughout.
+ *
+ * All money is handled as integer minor units (cents / halala) to avoid float
+ * drift.
  */
 
 // *********** Parsing ***********
@@ -39,6 +44,18 @@ export function toMinor(value) {
 }
 
 const sum = (values) => values.reduce((acc, v) => acc + (v ?? 0), 0);
+
+/**
+ * An amount in minor units × an exchange rate (SAR per 1 unit), rounded
+ * half-up to the halala in integer arithmetic — the backend's toSarHalala.
+ */
+export function toSarMinor(minor, exchangeRate) {
+  if (minor == null || !(exchangeRate > 0)) return null;
+  const rateMicros = BigInt(Math.round(exchangeRate * 1_000_000));
+  const abs = BigInt(Math.abs(minor)) * rateMicros;
+  const sar = Number((abs + 500_000n) / 1_000_000n);
+  return minor < 0 ? -sar : sar;
+}
 
 export function formatMinor(minor) {
   if (minor == null) return '—';
@@ -117,18 +134,18 @@ export function summarizeInvoiceXml(doc) {
   const refs = kids(root, 'AdditionalDocumentReference');
   const ref = (id) => refs.find((r) => textAt(r, 'ID') === id) ?? null;
   const taxTotals = kids(root, 'TaxTotal');
-  // The TaxTotal carrying the VAT breakdown; the other repeats the amount in the tax currency.
+  // The TaxTotal carrying the VAT breakdown; the other gives the VAT total in the tax currency, SAR.
   const breakdownTotal = taxTotals.find((t) => kids(t, 'TaxSubtotal').length > 0) ?? taxTotals[0] ?? null;
+  const taxCurrencyTotal = taxTotals.find((t) => t !== breakdownTotal) ?? null;
   const monetary = kid(root, 'LegalMonetaryTotal');
   const money = (name) => toMinor(textAt(monetary, name));
   const documentAllowances = kids(root, 'AllowanceCharge');
   const typeCode = kid(root, 'InvoiceTypeCode');
 
-  const amountCurrencies = new Set(
-    Array.from(doc.getElementsByTagName('*'))
-      .map((el) => el.getAttribute('currencyID'))
-      .filter(Boolean)
-  );
+  const currencyIds = Array.from(doc.getElementsByTagName('*'))
+    .map((el) => el.getAttribute('currencyID'))
+    .filter(Boolean);
+  const amountCurrencies = new Set(currencyIds);
 
   return {
     id: textAt(root, 'ID'),
@@ -140,6 +157,7 @@ export function summarizeInvoiceXml(doc) {
     documentCurrency: textAt(root, 'DocumentCurrencyCode'),
     taxCurrency: textAt(root, 'TaxCurrencyCode'),
     amountCurrencies: [...amountCurrencies],
+    currencyIds,
     icv: textAt(ref('ICV'), 'UUID'),
     billingReference: textAt(root, 'BillingReference', 'InvoiceDocumentReference', 'ID'),
     seller: {
@@ -161,6 +179,13 @@ export function summarizeInvoiceXml(doc) {
     })),
     taxTotal: toMinor(textAt(breakdownTotal, 'TaxAmount')),
     taxTotals: taxTotals.map((t) => toMinor(textAt(t, 'TaxAmount'))),
+    // BT-111: the VAT total in the tax currency (SAR).
+    taxCurrencyTotal: taxCurrencyTotal
+      ? {
+          amount: toMinor(textAt(taxCurrencyTotal, 'TaxAmount')),
+          currency: kid(taxCurrencyTotal, 'TaxAmount')?.getAttribute('currencyID') ?? null,
+        }
+      : null,
     documentAllowanceTotal: sum(
       documentAllowances.filter((ac) => textAt(ac, 'ChargeIndicator') === 'false').map((ac) => toMinor(textAt(ac, 'Amount')))
     ),
@@ -183,13 +208,23 @@ export function summarizeInvoiceXml(doc) {
 const amountsDiffer = (a, b) => a == null || b == null || a !== b;
 const pair = (label, actual, expected) => `${label} ${formatMinor(actual)} ≠ ${formatMinor(expected)}`;
 
+/** Whether the XML is in a currency other than SAR (amounts in it, VAT also in SAR). */
+export const isForeignCurrencyXml = (summary) => !!summary?.documentCurrency && summary.documentCurrency !== 'SAR';
+
 /**
- * Checks that the XML is internally consistent, carries SAR, and (when
- * available) matches the invoice's stored SAR totals and its QR code.
+ * Checks that the XML is internally consistent, carries the right currencies,
+ * and (when available) matches the invoice's stored totals and its QR code.
+ * `stored`: { invoiceCurrency, sar } totals, the invoice's `currency` and
+ * `exchangeRate`.
+ * An XML in SAR (a SAR invoice, or one reported before multi-currency XML) is
+ * checked against the stored SAR totals; a foreign-currency XML against the
+ * invoice-currency totals, with its VAT in SAR = VAT × the exchange rate.
  * Each check: { id, label, status: 'pass' | 'fail' | 'warn', detail }.
  */
-export function checkInvoiceXml(summary, storedSarTotals) {
+export function checkInvoiceXml(summary, stored = {}) {
   const { totals, lines, breakdown } = summary;
+  const foreign = isForeignCurrencyXml(summary);
+  const docCurrency = summary.documentCurrency;
   const checks = [];
   const add = (id, label, failures, { warnOnly = false, passDetail = '' } = {}) =>
     checks.push({
@@ -199,10 +234,22 @@ export function checkInvoiceXml(summary, storedSarTotals) {
       detail: failures.length === 0 ? passDetail : failures.join('; '),
     });
 
-  const nonSar = [summary.documentCurrency, summary.taxCurrency, ...summary.amountCurrencies].filter((c) => c && c !== 'SAR');
-  add('currency', 'All amounts are in SAR', nonSar.length ? [`found ${[...new Set(nonSar)].join(', ')}`] : [], {
-    passDetail: 'Document, tax and amount currencies are SAR',
-  });
+  if (foreign) {
+    // BR-KSA-CL-02: every amount in BT-5 except the VAT total in SAR (BT-111).
+    const issues = [];
+    if (summary.taxCurrency !== 'SAR') issues.push(`tax currency is ${summary.taxCurrency ?? 'missing'}, not SAR`);
+    const others = summary.currencyIds.filter((c) => c !== docCurrency);
+    if (others.length !== 1 || others[0] !== 'SAR' || summary.taxCurrencyTotal?.currency !== 'SAR')
+      issues.push(`expected one SAR amount (the VAT total in SAR), found ${others.length ? others.join(', ') : 'none'}`);
+    add('currency', `Amounts are in ${docCurrency}, the VAT total also in SAR`, issues, {
+      passDetail: `Every amount is ${docCurrency} except the VAT total in SAR; tax currency SAR`,
+    });
+  } else {
+    const nonSar = [summary.documentCurrency, summary.taxCurrency, ...summary.amountCurrencies].filter((c) => c && c !== 'SAR');
+    add('currency', 'All amounts are in SAR', nonSar.length ? [`found ${[...new Set(nonSar)].join(', ')}`] : [], {
+      passDetail: 'Document, tax and amount currencies are SAR',
+    });
+  }
 
   const linesNet = sum(lines.map((l) => l.net));
   add('lines-sum', 'Line amounts add up to the line total', amountsDiffer(linesNet, totals.lineExtension)
@@ -244,8 +291,22 @@ export function checkInvoiceXml(summary, storedSarTotals) {
     ? [pair('Σ VAT', breakdownTax, summary.taxTotal)]
     : []);
 
-  const taxTotalsDisagree = summary.taxTotals.some((t) => t !== summary.taxTotal);
-  add('tax-totals', 'Both VAT totals agree', taxTotalsDisagree ? [`VAT totals ${summary.taxTotals.map(formatMinor).join(' vs ')}`] : []);
+  if (foreign) {
+    const sarVat = summary.taxCurrencyTotal?.amount ?? null;
+    const expected = toSarMinor(summary.taxTotal, stored.exchangeRate);
+    const issues =
+      expected == null
+        ? ['no exchange rate stored for this invoice']
+        : amountsDiffer(sarVat, expected)
+          ? [`SAR VAT ${formatMinor(sarVat)} ≠ ${formatMinor(summary.taxTotal)} × ${stored.exchangeRate} = ${formatMinor(expected)}`]
+          : [];
+    add('tax-totals', 'VAT total in SAR = VAT × exchange rate', issues, {
+      passDetail: `${formatMinor(summary.taxTotal)} ${docCurrency} × ${stored.exchangeRate} = ${formatMinor(sarVat)} SAR`,
+    });
+  } else {
+    const taxTotalsDisagree = summary.taxTotals.some((t) => t !== summary.taxTotal);
+    add('tax-totals', 'Both VAT totals agree', taxTotalsDisagree ? [`VAT totals ${summary.taxTotals.map(formatMinor).join(' vs ')}`] : []);
+  }
 
   const expectedInclusive = (totals.taxExclusive ?? 0) + (summary.taxTotal ?? 0);
   add('tax-inclusive', 'Total with VAT = total without VAT + VAT', amountsDiffer(expectedInclusive, totals.taxInclusive)
@@ -263,16 +324,27 @@ export function checkInvoiceXml(summary, storedSarTotals) {
     .map((l) => `line ${l.id} is category ${l.category}, the VAT breakdown has ${[...breakdownCategories].join(', ') || 'none'}`);
   add('categories', 'Every line tax category is in the VAT breakdown', categoryIssues, { warnOnly: true });
 
-  if (storedSarTotals) {
+  // The stored totals in the XML's currency.
+  const storedTotals = foreign ? stored.invoiceCurrency : stored.sar;
+  // A foreign invoice whose XML is in SAR was built with the earlier
+  // line-by-line SAR conversion; if it was never reported, its stored SAR
+  // totals have since been recomputed as amount × rate, so cents may differ.
+  const legacySarXml = !foreign && !!stored.currency && stored.currency !== 'SAR';
+  if (storedTotals) {
     const issues = [];
-    if (amountsDiffer(totals.taxExclusive, storedSarTotals.subtotal))
-      issues.push(pair('total without VAT', totals.taxExclusive, storedSarTotals.subtotal));
-    if (amountsDiffer(summary.taxTotal, storedSarTotals.vatAmount))
-      issues.push(pair('VAT', summary.taxTotal, storedSarTotals.vatAmount));
-    if (amountsDiffer(totals.payable, storedSarTotals.grandTotal))
-      issues.push(pair('payable', totals.payable, storedSarTotals.grandTotal));
-    add('stored-totals', "Matches the invoice's stored SAR totals", issues, {
-      passDetail: `${formatMinor(storedSarTotals.subtotal)} + ${formatMinor(storedSarTotals.vatAmount)} VAT = ${formatMinor(storedSarTotals.grandTotal)} SAR`,
+    if (amountsDiffer(totals.taxExclusive, storedTotals.subtotal))
+      issues.push(pair('total without VAT', totals.taxExclusive, storedTotals.subtotal));
+    if (amountsDiffer(summary.taxTotal, storedTotals.vatAmount))
+      issues.push(pair('VAT', summary.taxTotal, storedTotals.vatAmount));
+    if (amountsDiffer(totals.payable, storedTotals.grandTotal))
+      issues.push(pair('payable', totals.payable, storedTotals.grandTotal));
+    if (foreign && stored.sar && amountsDiffer(summary.taxCurrencyTotal?.amount, stored.sar.vatAmount))
+      issues.push(pair('SAR VAT', summary.taxCurrencyTotal?.amount, stored.sar.vatAmount));
+    if (legacySarXml && issues.length)
+      issues.push('this XML predates multi-currency XML (line-by-line SAR conversion); the stored SAR totals are now amount × rate');
+    add('stored-totals', foreign ? "Matches the invoice's stored totals" : "Matches the invoice's stored SAR totals", issues, {
+      warnOnly: legacySarXml,
+      passDetail: `${formatMinor(storedTotals.subtotal)} + ${formatMinor(storedTotals.vatAmount)} VAT = ${formatMinor(storedTotals.grandTotal)} ${foreign ? docCurrency : 'SAR'}`,
     });
   }
 

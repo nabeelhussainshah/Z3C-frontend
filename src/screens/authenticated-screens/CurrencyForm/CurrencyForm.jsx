@@ -154,7 +154,7 @@ function CurrencyForm() {
           {isEdit ? `Edit ${form.code || 'Currency'}` : 'Add Currency'}
         </h2>
         <p className="breeze-page__lede">
-          Enter amounts in this currency on invoices; they are converted to SAR for ZATCA.
+          Enter amounts in this currency on invoices; they are reported to ZATCA in it, with the VAT also in SAR.
         </p>
       </div>
     </div>
