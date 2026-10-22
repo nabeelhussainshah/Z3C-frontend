@@ -3,9 +3,11 @@ import { Buffer } from 'node:buffer';
 import { mockBackend, signIn, ok, callsTo } from './support/mock-backend';
 
 /**
- * ZATCA XML viewer. The backend is mocked; the XML fixture mirrors what the
- * generator emits for a USD invoice at 3.75 (INV-2026-000018 in dev): four
- * lines, two discounted, one exempt, all amounts in SAR.
+ * ZATCA XML viewer. The backend is mocked. Two XML fixtures for the same USD
+ * invoice at 3.75 (INV-2026-000018 in dev; four lines, two discounted, one
+ * exempt): as reported before multi-currency XML (every amount in SAR, the
+ * default fixture), and as reported now (amounts in USD, the VAT total also
+ * in SAR).
  */
 
 // *********** Fixture ***********
@@ -26,24 +28,58 @@ const LINES = [
   { id: 4, name: 'Training abroad', net: '1249.99', vat: '0.00', withVat: '1249.99', cat: 'O', pct: '0.00' },
 ];
 
-function invoiceXml({ payable = '12356.79', qrTotal = '12356.79', qrVat = '1448.71', lines = LINES } = {}) {
+// The same invoice in USD (the stored invoice-currency totals): S taxable
+// 2575.49, VAT 386.32 (in SAR: 386.32 × 3.75 = 1448.70), exempt 333.33.
+const USD_LINES = [
+  { id: 1, name: 'Cloud hosting', net: '1250.50', vat: '187.58', withVat: '1438.08', cat: 'S', pct: '15' },
+  { id: 2, name: 'Support plan', net: '449.99', vat: '67.50', withVat: '517.49', cat: 'S', pct: '15', gross: '499.99', discount: '50.00' },
+  { id: 3, name: 'Implementation', net: '875.00', vat: '131.25', withVat: '1006.25', cat: 'S', pct: '15', gross: '1000.00', discount: '125.00' },
+  { id: 4, name: 'Training abroad', net: '333.33', vat: '0.00', withVat: '333.33', cat: 'O', pct: '0.00' },
+];
+
+const SAR_FORMAT = {
+  currency: 'SAR',
+  lines: LINES,
+  standard: ['9658.09', '1448.71'],
+  exempt: '1249.99',
+  lineExtension: '10908.08',
+  taxInclusive: '12356.79',
+  vat: '1448.71',
+  sarVat: '1448.71',
+};
+const USD_FORMAT = {
+  currency: 'USD',
+  lines: USD_LINES,
+  standard: ['2575.49', '386.32'],
+  exempt: '333.33',
+  lineExtension: '2908.82',
+  taxInclusive: '3295.14',
+  vat: '386.32',
+  sarVat: '1448.70',
+};
+
+function invoiceXml({ format = SAR_FORMAT, payable, qrTotal, qrVat, sarVat = format.sarVat, lines = format.lines } = {}) {
+  const c = format.currency;
+  payable ??= format.taxInclusive;
+  qrTotal ??= format.taxInclusive;
+  qrVat ??= format.vat;
   const qr = qrTlv({ 1: 'AVIANTA SERVICES LLC', 2: '399999999900003', 3: '2026-09-22T21:13:33Z', 4: qrTotal, 5: qrVat, 6: 'x'.repeat(44) });
   const line = (l) => `
     <cac:InvoiceLine>
         <cbc:ID>${l.id}</cbc:ID>
         <cbc:InvoicedQuantity unitCode="PCE">${l.qty ?? 1}</cbc:InvoicedQuantity>
-        <cbc:LineExtensionAmount currencyID="SAR">${l.net}</cbc:LineExtensionAmount>
+        <cbc:LineExtensionAmount currencyID="${c}">${l.net}</cbc:LineExtensionAmount>
         <cac:TaxTotal>
-            <cbc:TaxAmount currencyID="SAR">${l.vat}</cbc:TaxAmount>
-            <cbc:RoundingAmount currencyID="SAR">${l.withVat}</cbc:RoundingAmount>
+            <cbc:TaxAmount currencyID="${c}">${l.vat}</cbc:TaxAmount>
+            <cbc:RoundingAmount currencyID="${c}">${l.withVat}</cbc:RoundingAmount>
         </cac:TaxTotal>
         <cac:Item>
             <cbc:Name>${l.name}</cbc:Name>
             <cac:ClassifiedTaxCategory><cbc:ID>${l.cat}</cbc:ID><cbc:Percent>${l.pct}</cbc:Percent></cac:ClassifiedTaxCategory>
         </cac:Item>
         <cac:Price>
-            <cbc:PriceAmount currencyID="SAR">${l.unitNet ?? l.net}</cbc:PriceAmount>
-            ${l.discount ? `<cac:AllowanceCharge><cbc:ChargeIndicator>false</cbc:ChargeIndicator><cbc:Amount currencyID="SAR">${l.unitDiscount ?? l.discount}</cbc:Amount><cbc:BaseAmount currencyID="SAR">${l.unitGross ?? l.gross}</cbc:BaseAmount></cac:AllowanceCharge>` : ''}
+            <cbc:PriceAmount currencyID="${c}">${l.unitNet ?? l.net}</cbc:PriceAmount>
+            ${l.discount ? `<cac:AllowanceCharge><cbc:ChargeIndicator>false</cbc:ChargeIndicator><cbc:Amount currencyID="${c}">${l.unitDiscount ?? l.discount}</cbc:Amount><cbc:BaseAmount currencyID="${c}">${l.unitGross ?? l.gross}</cbc:BaseAmount></cac:AllowanceCharge>` : ''}
         </cac:Price>
     </cac:InvoiceLine>`;
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -55,33 +91,33 @@ function invoiceXml({ payable = '12356.79', qrTotal = '12356.79', qrVat = '1448.
     <cbc:IssueDate>2026-09-22</cbc:IssueDate>
     <cbc:IssueTime>21:13:33Z</cbc:IssueTime>
     <cbc:InvoiceTypeCode name="0100000">388</cbc:InvoiceTypeCode>
-    <cbc:DocumentCurrencyCode>SAR</cbc:DocumentCurrencyCode>
+    <cbc:DocumentCurrencyCode>${c}</cbc:DocumentCurrencyCode>
     <cbc:TaxCurrencyCode>SAR</cbc:TaxCurrencyCode>
     <cac:AdditionalDocumentReference><cbc:ID>ICV</cbc:ID><cbc:UUID>10</cbc:UUID></cac:AdditionalDocumentReference>
     <cac:AdditionalDocumentReference><cbc:ID>QR</cbc:ID><cac:Attachment><cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">${qr}</cbc:EmbeddedDocumentBinaryObject></cac:Attachment></cac:AdditionalDocumentReference>
     <cac:AccountingSupplierParty><cac:Party><cac:PartyTaxScheme><cbc:CompanyID>399999999900003</cbc:CompanyID></cac:PartyTaxScheme><cac:PartyLegalEntity><cbc:RegistrationName>AVIANTA SERVICES LLC</cbc:RegistrationName></cac:PartyLegalEntity></cac:Party></cac:AccountingSupplierParty>
     <cac:AccountingCustomerParty><cac:Party><cac:PartyTaxScheme><cbc:CompanyID>311111111100003</cbc:CompanyID></cac:PartyTaxScheme><cac:PartyLegalEntity><cbc:RegistrationName>Al Nakheel Contracting Est.</cbc:RegistrationName></cac:PartyLegalEntity></cac:Party></cac:AccountingCustomerParty>
     <cac:TaxTotal>
-        <cbc:TaxAmount currencyID="SAR">1448.71</cbc:TaxAmount>
+        <cbc:TaxAmount currencyID="${c}">${format.vat}</cbc:TaxAmount>
         <cac:TaxSubtotal>
-            <cbc:TaxableAmount currencyID="SAR">9658.09</cbc:TaxableAmount>
-            <cbc:TaxAmount currencyID="SAR">1448.71</cbc:TaxAmount>
+            <cbc:TaxableAmount currencyID="${c}">${format.standard[0]}</cbc:TaxableAmount>
+            <cbc:TaxAmount currencyID="${c}">${format.standard[1]}</cbc:TaxAmount>
             <cac:TaxCategory><cbc:ID>S</cbc:ID><cbc:Percent>15</cbc:Percent></cac:TaxCategory>
         </cac:TaxSubtotal>
         <cac:TaxSubtotal>
-            <cbc:TaxableAmount currencyID="SAR">1249.99</cbc:TaxableAmount>
-            <cbc:TaxAmount currencyID="SAR">0.00</cbc:TaxAmount>
+            <cbc:TaxableAmount currencyID="${c}">${format.exempt}</cbc:TaxableAmount>
+            <cbc:TaxAmount currencyID="${c}">0.00</cbc:TaxAmount>
             <cac:TaxCategory><cbc:ID>Z</cbc:ID><cbc:Percent>0.00</cbc:Percent><cbc:TaxExemptionReasonCode>VATEX-SA-33</cbc:TaxExemptionReasonCode><cbc:TaxExemptionReason>Export of services</cbc:TaxExemptionReason></cac:TaxCategory>
         </cac:TaxSubtotal>
     </cac:TaxTotal>
-    <cac:TaxTotal><cbc:TaxAmount currencyID="SAR">1448.71</cbc:TaxAmount></cac:TaxTotal>
+    <cac:TaxTotal><cbc:TaxAmount currencyID="SAR">${sarVat}</cbc:TaxAmount></cac:TaxTotal>
     <cac:LegalMonetaryTotal>
-        <cbc:LineExtensionAmount currencyID="SAR">10908.08</cbc:LineExtensionAmount>
-        <cbc:TaxExclusiveAmount currencyID="SAR">10908.08</cbc:TaxExclusiveAmount>
-        <cbc:TaxInclusiveAmount currencyID="SAR">12356.79</cbc:TaxInclusiveAmount>
-        <cbc:AllowanceTotalAmount currencyID="SAR">0</cbc:AllowanceTotalAmount>
-        <cbc:PrepaidAmount currencyID="SAR">0</cbc:PrepaidAmount>
-        <cbc:PayableAmount currencyID="SAR">${payable}</cbc:PayableAmount>
+        <cbc:LineExtensionAmount currencyID="${c}">${format.lineExtension}</cbc:LineExtensionAmount>
+        <cbc:TaxExclusiveAmount currencyID="${c}">${format.lineExtension}</cbc:TaxExclusiveAmount>
+        <cbc:TaxInclusiveAmount currencyID="${c}">${format.taxInclusive}</cbc:TaxInclusiveAmount>
+        <cbc:AllowanceTotalAmount currencyID="${c}">0</cbc:AllowanceTotalAmount>
+        <cbc:PrepaidAmount currencyID="${c}">0</cbc:PrepaidAmount>
+        <cbc:PayableAmount currencyID="${c}">${payable}</cbc:PayableAmount>
     </cac:LegalMonetaryTotal>${lines.map(line).join('')}
 </Invoice>`;
 }
@@ -130,6 +166,18 @@ const xmlView = (over = {}) => ({
   documents: [COMPLIANCE_DOC, SUBMITTED_DOC, CLEARED_DOC],
   ...over,
 });
+
+/** The same invoice reported in USD: stored SAR totals are the USD totals × 3.75. */
+const usdDoc = (doc, over = {}) => ({ ...doc, xml: invoiceXml({ format: USD_FORMAT, ...over }) });
+const usdXmlView = (over = {}) =>
+  xmlView({
+    totals: {
+      invoiceCurrency: { subtotal: 290882, discountAmount: 17500, vatAmount: 38632, grandTotal: 329514 },
+      sar: { subtotal: 1090808, discountAmount: 65625, vatAmount: 144870, grandTotal: 1235678 },
+    },
+    documents: [usdDoc(COMPLIANCE_DOC), usdDoc(SUBMITTED_DOC), usdDoc(CLEARED_DOC)],
+    ...over,
+  });
 
 const LIST_ROW = {
   _id: 'inv-18',
@@ -192,7 +240,7 @@ test.describe('ZATCA XML viewer', () => {
     await expect(dialog(page).getByText('XSD_ZATCA_VALID')).toBeVisible();
   });
 
-  test('compliance tab: SDK stages and coded warnings; explains the USD → SAR conversion', async ({ page }) => {
+  test('compliance tab: SDK stages and coded warnings; legacy SAR XML of a USD invoice shows a notice, not a failure', async ({ page }) => {
     await openViewerFromList(page);
     await dialog(page).getByRole('tab', { name: /Compliance check/ }).click();
 
@@ -202,7 +250,59 @@ test.describe('ZATCA XML viewer', () => {
     await expect(messages).toContainText('Warnings (2)');
     await expect(messages).toContainText('BR-O-01');
     await expect(messages).not.toContainText('Errors');
-    await expect(dialog(page).getByText(/entered in USD at 3.75 SAR per 1 USD \(total 3,295.14 USD\)/)).toBeVisible();
+    await expect(
+      dialog(page).getByText(/entered in USD at 3.75 SAR per 1 USD \(total 3,295.14 USD\) and was reported to ZATCA in SAR/)
+    ).toBeVisible();
+    await expect(check(page, 'currency')).toHaveAttribute('data-status', 'pass');
+    await expect(check(page, 'stored-totals')).toHaveAttribute('data-status', 'pass');
+  });
+
+  test('an old SAR compliance XML of a USD invoice whose SAR totals were recomputed: a warning, not a failure', async ({ page }) => {
+    // Never reported: the migration recomputed sarTotals as amount × rate (1,448.70 VAT).
+    const view = xmlView({
+      status: 'COMPLIANCE_COMPLETED',
+      totals: { ...xmlView().totals, sar: { subtotal: 1090808, discountAmount: 65625, vatAmount: 144870, grandTotal: 1235678 } },
+      documents: [COMPLIANCE_DOC],
+    });
+    await openViewerFromList(page, { view });
+
+    await expect(check(page, 'stored-totals')).toHaveAttribute('data-status', 'warn');
+    await expect(check(page, 'stored-totals')).toContainText('VAT 1,448.71 ≠ 1,448.70');
+    await expect(check(page, 'stored-totals')).toContainText('this XML predates multi-currency XML');
+    await expect(check(page, 'tax-totals')).toHaveAttribute('data-status', 'pass');
+  });
+
+  test('a USD invoice reported in USD: amounts in USD, the VAT also in SAR, and every check passes', async ({ page }) => {
+    await openViewerFromList(page, { view: usdXmlView() });
+
+    await expect(
+      dialog(page).getByText(/every amount in this XML is in USD, and the VAT total is also given in SAR at 3.75 SAR per 1 USD/)
+    ).toBeVisible();
+    const amounts = dialog(page).getByTestId('zatca-amounts');
+    await expect(amounts.getByTestId('xml-total-Total without VAT')).toContainText('2,908.82');
+    await expect(amounts.getByTestId('xml-total-VAT')).toContainText('386.32');
+    await expect(amounts.getByTestId('xml-total-VAT in SAR')).toContainText('1,448.70');
+    await expect(amounts.getByTestId('xml-qr')).toContainText('5. VAT total:386.32');
+
+    for (const id of ['currency', 'lines-sum', 'line-vat', 'line-quantity', 'line-price', 'tax-exclusive', 'breakdown-taxable', 'breakdown-tax', 'tax-totals', 'tax-inclusive', 'payable', 'stored-totals', 'qr']) {
+      await expect(check(page, id), id).toHaveAttribute('data-status', 'pass');
+    }
+    await expect(check(page, 'currency')).toContainText('Amounts are in USD, the VAT total also in SAR');
+    await expect(check(page, 'tax-totals')).toContainText('386.32 USD × 3.75 = 1,448.70 SAR');
+    await expect(check(page, 'stored-totals')).toContainText('2,908.82 + 386.32 VAT = 3,295.14 USD');
+  });
+
+  test('a USD XML whose SAR VAT is not VAT × rate, or with a stray currency, fails the checks', async ({ page }) => {
+    const wrong = usdDoc(CLEARED_DOC, { sarVat: '1448.71' });
+    const stray = { ...wrong, kind: 'clearance-submitted', xml: wrong.xml.replace('<cbc:PayableAmount currencyID="USD">', '<cbc:PayableAmount currencyID="EUR">') };
+    await openViewerFromList(page, { view: usdXmlView({ documents: [stray] }) });
+
+    await expect(check(page, 'tax-totals')).toHaveAttribute('data-status', 'fail');
+    await expect(check(page, 'tax-totals')).toContainText('SAR VAT 1,448.71 ≠ 386.32 × 3.75 = 1,448.70');
+    await expect(check(page, 'stored-totals')).toHaveAttribute('data-status', 'fail');
+    await expect(check(page, 'stored-totals')).toContainText('SAR VAT 1,448.71 ≠ 1,448.70');
+    await expect(check(page, 'currency')).toHaveAttribute('data-status', 'fail');
+    await expect(check(page, 'currency')).toContainText('found SAR, EUR');
   });
 
   test('summarises the SAR amounts in the XML: totals, lines, VAT breakdown and QR', async ({ page }) => {
@@ -241,7 +341,8 @@ test.describe('ZATCA XML viewer', () => {
 
   test('checks fail when the XML payable disagrees with its totals, the stored SAR totals and the QR', async ({ page }) => {
     const tampered = { ...CLEARED_DOC, xml: invoiceXml({ payable: '12356.80', qrTotal: '12000.00' }) };
-    await openViewerFromList(page, { view: xmlView({ documents: [tampered] }) });
+    // A SAR invoice: a mismatch with its stored SAR totals is a failure.
+    await openViewerFromList(page, { view: xmlView({ currency: 'SAR', exchangeRate: 1, documents: [tampered] }) });
 
     await expect(check(page, 'payable')).toHaveAttribute('data-status', 'fail');
     await expect(check(page, 'payable')).toContainText('payable 12,356.80 ≠ 12,356.79');
