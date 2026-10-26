@@ -93,7 +93,7 @@ function CurrencyList() {
     <div>
       <h2 className="breeze-page__title">Currencies</h2>
       <p className="breeze-page__lede">
-        Currencies available on invoices. Invoices are always reported to ZATCA in SAR.
+        Currencies available on invoices. Invoices are reported to ZATCA in their own currency, with the VAT also in SAR.
       </p>
     </div>
   );

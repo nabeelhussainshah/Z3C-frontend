@@ -1505,6 +1505,7 @@ function InvoiceFormContent({ id, invoicePromise, decodedToken, navigate }) {
           min: '0',
           step: '0.000001',
           placeholder: 'e.g. 3.75',
+          hint: 'Use the Saudi Central Bank daily rate for the date VAT becomes due. The VAT total is also reported to ZATCA in SAR at this rate.',
         })}
         {TEXT_FIELD({
           label: 'Note',
